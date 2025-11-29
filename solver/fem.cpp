@@ -1,13 +1,9 @@
-#include <Eigen/Dense>
+// #include <Eigen/Dense>
 
-int add(int a, int b)
-{
-    return a + b;
-}
+auto add(int a, int b) -> int { return a + b; }
 
-// Eigen::VectorXd solve_poisson(const Mesh &mesh)
-// {
-//     // assemble matrix A and vector b
-//     // solve Ax = b
-//     return x;
+// Eigen::VectorXd solve_poisson(const Mesh &mesh) {
+//   // assemble matrix A and vector b
+//   // solve Ax = b
+//   return x;
 // }

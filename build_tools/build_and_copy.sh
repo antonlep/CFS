@@ -2,15 +2,6 @@
 # Portable script to build C++ solver and copy to GUI folder
 # Requires: CMake, pybind11, Eigen installed in WSL
 
-# Load user config
-# CONFIG_FILE="build_tools/config.sh"
-# if [ ! -f "$CONFIG_FILE" ]; then
-#     echo "❌ Config file $CONFIG_FILE not found!"
-#     echo "Please copy config.sh.example → config.sh and edit the GUI_DIR path"
-#     exit 1
-# fi
-# source "$CONFIG_FILE"
-
 # Directories
 SOLVER_DIR="solver"
 GUI_DIR="gui"

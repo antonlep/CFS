@@ -1,0 +1,22 @@
+[project]
+name = "cfsolve"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "antonlep",email = "antonleppa@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "isort (>=7.0.0,<8.0.0)",
+    "flake8 (>=7.3.0,<8.0.0)",
+    "black (>=25.11.0,<26.0.0)",
+    "pybind11[global] (>=3.0.1,<4.0.0)"
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
