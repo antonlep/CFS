@@ -1,0 +1,2 @@
+# Path to your Windows Python GUI project folder (WSL path)
+WINDOWS_GUI_DIR="/mnt/c/Users/YourUsername/projects/solveforge/python_gui"
