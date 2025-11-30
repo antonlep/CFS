@@ -1,3 +1,5 @@
+import sys
+
 import solver
 
 # from gui import show_solution

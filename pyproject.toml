@@ -6,12 +6,13 @@ authors = [
     {name = "antonlep",email = "antonleppa@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "isort (>=7.0.0,<8.0.0)",
     "flake8 (>=7.3.0,<8.0.0)",
     "black (>=25.11.0,<26.0.0)",
-    "pybind11[global] (>=3.0.1,<4.0.0)"
+    "pybind11[global] (>=3.0.1,<4.0.0)",
+    "pyside6 (>=6.10.1,<7.0.0)"
 ]
 
 [tool.poetry]

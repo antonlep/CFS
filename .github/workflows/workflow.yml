@@ -6,11 +6,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12.3
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang clang-tidy clang-format cmake libeigen3-dev
           pip install "pybind11[global]"
+          pipx install poetry==1.8.4
+          poetry install
 
       - name: Configure cmake
         run: |
