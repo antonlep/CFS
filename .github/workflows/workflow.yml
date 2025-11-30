@@ -1,7 +1,7 @@
 name: workflow
 on: [push]
 jobs:
-  lint:
+  Lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -23,12 +23,24 @@ jobs:
         run: |
           cmake -S solver -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      - name: Check clang-format
+      - name: Run clang-format
         run: |
-          find solver -name '*.cpp' -o -name '*.hpp' | xargs clang-format -style=file -i
+          find solver -name '*.cpp' -o -name '*.hpp' | xargs clang-format --dry-run --Werror -style=file -i
           git diff --exit-code
 
       - name: Run clang-tidy
         run: |
           clang-tidy solver/*.cpp -p build
+
+      - name: Run isort
+        run: |
+          poetry run isort -c .
+
+      - name: Run black
+        run: |
+          poetry run black --check .
+
+      - name: Run flake8
+        run: |
+          poetry run flake8 .
       
