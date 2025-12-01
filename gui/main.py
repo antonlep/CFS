@@ -5,14 +5,12 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
-    QLineEdit,
     QMainWindow,
-    QVBoxLayout,
-    QWidget,
-    QMenu
+    QMenu,
 )
 
 import solver
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
