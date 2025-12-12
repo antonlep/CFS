@@ -37,9 +37,7 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
-        button_action2 = QAction(
-            QIcon("assets/bug.png"), "Your &button2", self
-        )
+        button_action2 = QAction(QIcon("assets/bug.png"), "Your &button2", self)
         button_action2.setStatusTip("This is your button2")
         button_action2.triggered.connect(self.toolbar_button_clicked)
         button_action2.setCheckable(True)
