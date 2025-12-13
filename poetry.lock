@@ -1152,6 +1152,34 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+name = "scikit-build-core"
+version = "0.11.6"
+description = "Build backend for CMake based projects"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "scikit_build_core-0.11.6-py3-none-any.whl", hash = "sha256:ce6d8fe64e6b4c759ea0fb95d2f8a68f60d2df31c2989838633b8ec930736360"},
+    {file = "scikit_build_core-0.11.6.tar.gz", hash = "sha256:5982ccd839735be99cfd3b92a8847c6c196692f476c215da84b79d2ad12f9f1b"},
+]
+
+[package.dependencies]
+packaging = ">=23.2"
+pathspec = ">=0.10.1"
+
+[package.extras]
+cov = ["pytest-cov"]
+dev = ["rich"]
+docs = ["furo", "hatchling", "myst-parser (>=0.13)", "setuptools", "sphinx (>=7.0)", "sphinx-autodoc-typehints", "sphinx-copybutton", "sphinx-inline-tabs", "sphinx-jsonschema", "sphinx-tippy", "sphinxcontrib-programoutput"]
+test = ["build (>=0.8)", "cattrs (>=22.2.0)", "pip (>=23) ; python_version < \"3.13\"", "pip (>=24.1) ; python_version >= \"3.13\"", "pybind11 (>=2.11)", "pytest (>=7.2)", "pytest-subprocess (>=1.5)", "pytest-xdist (>=3.1)", "setuptools (>=43) ; python_version < \"3.9\"", "setuptools (>=45) ; python_version == \"3.9\"", "setuptools (>=49) ; python_version >= \"3.10\" and python_version < \"3.12\"", "setuptools (>=66.1) ; python_version >= \"3.12\"", "virtualenv (>=20.20)", "wheel (>=0.40)"]
+test-hatchling = ["hatchling (>=1.24.0)"]
+test-meta = ["hatch-fancy-pypi-readme (>=22.3)", "setuptools-scm"]
+test-numpy = ["numpy (>=1.24.0,<1.25.0) ; python_version == \"3.8\" and platform_python_implementation == \"PyPy\"", "numpy (>=2.0.0,<2.1.0) ; python_version == \"3.9\" and platform_python_implementation == \"PyPy\"", "numpy (>=2.2.0,<2.3.0) ; python_version == \"3.10\" and platform_python_implementation == \"PyPy\"", "numpy ; python_version < \"3.14\" and platform_python_implementation != \"PyPy\" and (platform_system != \"Windows\" or platform_machine != \"ARM64\")"]
+test-schema = ["fastjsonschema", "validate-pyproject"]
+wheel-free-setuptools = ["setuptools (>=70.1) ; python_version >= \"3.8\""]
+wheels = ["cmake", "ninja ; sys_platform != \"win32\""]
+
+[[package]]
 name = "scooby"
 version = "0.11.0"
 description = "A Great Dane turned Python environment detective"
@@ -1272,4 +1300,4 @@ web = ["wslink (>=1.0.4)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "225745fa05f44517bac96ce9b1e999b4520fa0f4cf832f72a0f882b03666a705"
+content-hash = "5c0f87b4f82157884cd922cee9a8163c9fd13faf591c7c9ebe4cfb130886d5cc"

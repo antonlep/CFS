@@ -2,6 +2,7 @@ import sys
 
 import pyvista as pv
 import pyvistaqt as pvqt
+import solver
 from PySide6.QtCore import QSize
 from PySide6.QtWidgets import (
     QApplication,
@@ -12,8 +13,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-import solver
 
 
 class MainWindow(QMainWindow):

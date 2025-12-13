@@ -1,7 +1,8 @@
 import sys
 
-from layout_colorwidget import Color
 from PySide6.QtWidgets import QApplication, QGridLayout, QMainWindow, QWidget
+
+from layout_colorwidget import Color
 
 
 class MainWindow(QMainWindow):
