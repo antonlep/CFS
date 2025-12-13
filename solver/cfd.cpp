@@ -1,1 +1,1 @@
-auto add(int a, int b) -> int { return a + b; }
+auto multiply(int a, int b) -> int { return a * b; }
