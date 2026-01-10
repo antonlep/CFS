@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
     def the_button_was_clicked(self):
         box1 = self.box1.value()
         box2 = self.box2.value()
-        result = solver.add(box1, box2)
+        result = solver.plate(box1, box2, box1, box2)
         self.label.setText(str(result))
         print(f"Result: {result}")
         # Create the spatial reference

@@ -12,4 +12,7 @@ PYBIND11_MODULE(solver /*unused*/, m /*unused*/) {
 
   m.def("add", &add, "A function that adds two numbers", pybind11::arg("a"),
         pybind11::arg("b"));
+
+  m.def("plate", &plate, "A functionnumbers", pybind11::arg("h"),
+        pybind11::arg("w"), pybind11::arg("t"), pybind11::arg("f"));
 }
