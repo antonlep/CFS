@@ -24,7 +24,7 @@ jobs:
 
       - name: Clang-format
         run: |
-          find solver \( -name "*.cpp" -o -name "*.hpp" \) -not -path "src/solver/third_party/*" | xargs clang-format --dry-run --Werror -i
+          find src/solver \( -name "*.cpp" -o -name "*.hpp" \) -not -path "src/solver/third_party/*" | xargs clang-format --dry-run --Werror -i
           git diff --exit-code
 
       - name: Clang-tidy
