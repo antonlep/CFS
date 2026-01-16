@@ -3,6 +3,6 @@
 
 int add(int a, int b);
 
-float plate(float h, float w, float t, float f);
+double plate(double h, double w, double t, double f);
 
 #endif

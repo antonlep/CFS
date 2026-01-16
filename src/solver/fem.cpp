@@ -1,21 +1,31 @@
+#include "Eigen/Core"
 #include <Eigen/Dense>
 #include <iostream>
+#include <unordered_set>
+#include <vector>
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
-struct Node {
-  float x;
-  float y;
-};
-using Index = std::size_t;
+using Index = Eigen::Index;
+using Dir = std::size_t;
 using NodeId = Index;
+struct Node {
+  double x;
+  double y;
+};
+struct Disp {
+  Index dir;
+  double mag;
+};
 using Nodes = std::vector<Node>;
-using NodeIds = std::vector<NodeId>;
+using Elem = std::vector<NodeId>;
+using Elems = std::vector<Elem>;
+using Dirs = std::vector<Dir>;
 
-float area(Node i, Node j, Node k) {
+double area(Node i, Node j, Node k) {
   return 0.5 * (i.x * (j.y - k.y) + j.x * (k.y - i.y) + k.x * (i.y - j.y));
 }
 
-Nodes filter_by_index(const Nodes &data, const NodeIds &indices) {
+Nodes filter_by_index(const Nodes &data, const Elem &indices) {
   Nodes result;
 
   for (Index i : indices) {
@@ -25,14 +35,14 @@ Nodes filter_by_index(const Nodes &data, const NodeIds &indices) {
   return result;
 }
 
-MatrixXd stiffness_matrix(float E, float v, float t, const Nodes &all_nodes,
-                          const NodeIds &elem) {
+MatrixXd stiffness_matrix(double E, double v, double t, const Nodes &all_nodes,
+                          const Elem &elem) {
 
   auto nodes = filter_by_index(all_nodes, elem);
   Node i = nodes[0];
   Node j = nodes[1];
   Node k = nodes[2];
-  float A = area(i, j, k);
+  double A = area(i, j, k);
 
   MatrixXd B(3, 6);
   MatrixXd D(3, 3);
@@ -50,7 +60,8 @@ MatrixXd stiffness_matrix(float E, float v, float t, const Nodes &all_nodes,
   return K;
 }
 
-MatrixXd update_global_stiffness(MatrixXd K, MatrixXd k, const NodeIds &order) {
+void update_global_stiffness(MatrixXd &K, const MatrixXd &k,
+                             const Elem &order) {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       K(order[i] * 2, order[j] * 2) += k(i * 2, j * 2);
@@ -59,22 +70,21 @@ MatrixXd update_global_stiffness(MatrixXd K, MatrixXd k, const NodeIds &order) {
       K(order[i] * 2 + 1, order[j] * 2 + 1) += k(i * 2 + 1, j * 2 + 1);
     }
   }
-  return K;
 }
 
-VectorXd element_stress(float E, float v, float t, const Nodes &nodes,
-                        const NodeIds &order, VectorXd u_all) {
-  std::vector<int> ind_order;
-  for (int i = 0; i < 3; i++) {
-    ind_order.push_back(order[i] * 2);
-    ind_order.push_back(order[i] * 2 + 1);
-  };
+VectorXd element_stress(double E, double v, double t, const Nodes &all_nodes,
+                        const Elem &elem, const VectorXd &u_all) {
+  Eigen::VectorXi ind_order(6);
+  for (int i = 0; i < 3; ++i) {
+    ind_order(2 * i) = static_cast<int>(elem[i] * 2);
+    ind_order(2 * i + 1) = static_cast<int>(elem[i] * 2 + 1);
+  }
   VectorXd u = u_all(ind_order);
 
-  Node i = nodes[0];
-  Node j = nodes[1];
-  Node k = nodes[2];
-  float A = area(i, j, k);
+  Node i = all_nodes[elem[0]];
+  Node j = all_nodes[elem[1]];
+  Node k = all_nodes[elem[2]];
+  double A = area(i, j, k);
 
   MatrixXd B(3, 6);
   MatrixXd D(3, 3);
@@ -94,53 +104,60 @@ VectorXd element_stress(float E, float v, float t, const Nodes &nodes,
 
 int add(int a, int b) { return a + b; }
 
-float plate(float h, float w, float t, float f) {
-  float E = 210E6;
-  float v = 0.3;
+double plate(double h, double w, double t, double f) {
+  double E = 210E6;
+  double v = 0.3;
   f = 0.5 * f;
-  Node p1 = {0, 0};
-  Node p2 = {0, 10};
-  Node p3 = {20, 10};
-  Node p4 = {20, 0};
-  Nodes nodes = {Node{0, 0}, Node{0, 10}, Node{20, 10}, Node{20, 0}};
-  Nodes nodes1 = {p1, p3, p2};
-  Nodes nodes2 = {p1, p4, p3};
-  NodeIds elem1 = {0, 2, 1};
-  NodeIds elem2 = {0, 3, 2};
-  int size = 4;
-  MatrixXd K = MatrixXd::Zero(size * 2, size * 2);
+  Nodes nodes = {Node{0, 0},  Node{0, 10}, Node{20, 10},
+                 Node{20, 0}, Node{30, 0}, Node{30, 10}};
+  int dofs = nodes.size() * 2;
+  Elem elem1 = {0, 2, 1};
+  Elem elem2 = {0, 3, 2};
+  Elem elem3 = {2, 3, 5};
+  Elem elem4 = {3, 4, 5};
+  Elems elems = {elem1, elem2, elem3, elem4};
+  std::vector<size_t> ind_zero = {0, 1, 2, 3};
+  VectorXd F{{0, 0, 0, 0, 0, 0, 0, 0, f, 0, f, 0}};
 
-  MatrixXd K1 = stiffness_matrix(E, v, t, nodes, elem1);
-  K = update_global_stiffness(K, K1, elem1);
+  MatrixXd K = MatrixXd::Zero(dofs, dofs);
+  for (Elem e : elems) {
+    MatrixXd K1 = stiffness_matrix(E, v, t, nodes, e);
+    update_global_stiffness(K, K1, e);
+  }
 
-  MatrixXd K2 = stiffness_matrix(E, v, t, nodes, elem2);
-  K = update_global_stiffness(K, K2, elem2);
+  std::unordered_set<size_t> remove(ind_zero.begin(), ind_zero.end());
+  std::vector<size_t> ind_nonzero;
+  for (int i = 0; i < dofs; ++i) {
+    if (!remove.count(i)) {
+      ind_nonzero.push_back(i);
+    };
+  };
 
-  NodeIds ind_nonzero{4, 5, 6, 7};
-  MatrixXd K_nonzero;
-  K_nonzero = K(ind_nonzero, ind_nonzero);
+  Eigen::VectorXi ind_nonzero_eig(ind_nonzero.size());
+  for (int i = 0; i < ind_nonzero.size(); ++i) {
+    ind_nonzero_eig(i) = static_cast<int>(ind_nonzero[i]);
+  }
 
-  VectorXd F(4);
-  F << f, 0, f, 0;
-  VectorXd u_nonzero(size);
-  u_nonzero = K_nonzero.colPivHouseholderQr().solve(F);
-  VectorXd u_zero(size);
-  u_zero = VectorXd::Zero(size);
-  VectorXd u(size * 2);
-  u << u_zero, u_nonzero;
+  MatrixXd K_nonzero = K(ind_nonzero_eig, ind_nonzero_eig);
+
+  VectorXd F_nonzero = F(ind_nonzero_eig);
+
+  VectorXd u_nonzero = K_nonzero.colPivHouseholderQr().solve(F_nonzero);
+
+  VectorXd u = VectorXd::Zero(dofs);
+  for (int i = 0; i < u_nonzero.size(); i++) {
+    u(ind_nonzero_eig[i]) = u_nonzero(i);
+  };
   std::cout << "u\n";
   std::cout << u << "\n";
   std::cout << "\n";
 
-  VectorXd S1 = element_stress(E, v, t, nodes1, elem1, u);
-  std::cout << "stress element 1" << std::endl;
-  std::cout << S1 << "\n";
-  std::cout << "\n";
+  for (int i = 0; i < elems.size(); i++) {
+    VectorXd S = element_stress(E, v, t, nodes, elems[i], u);
+    std::cout << "stress element " << i << "\n";
+    std::cout << S << "\n";
+    std::cout << "\n";
+  }
 
-  VectorXd S2 = element_stress(E, v, t, nodes2, elem2, u);
-  std::cout << "stress element 2" << "\n";
-  std::cout << S2 << "\n";
-  std::cout << "\n";
-
-  return u_nonzero[0];
+  return u_nonzero(0);
 }
