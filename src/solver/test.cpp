@@ -3,7 +3,7 @@
 
 int main() {
 
-  std::cout << solve_from_file("fem2.inp") << std::endl;
+  std::cout << solve_from_file("fem.inp") << std::endl;
 
   return 0;
 }

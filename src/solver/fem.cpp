@@ -1,5 +1,6 @@
 #include "Eigen/Core"
 #include "read_file.h"
+#include <cstddef>
 #include <iostream>
 #include <unordered_set>
 using Eigen::MatrixXd;
@@ -139,6 +140,19 @@ double solve(const SolverInput &input) {
   std::vector<size_t> u_indices = input.u_indices;
   std::vector<double> u_initial = input.u;
   VectorXd F = Eigen::Map<const VectorXd>(input.F.data(), input.F.size());
+  // for (Node n : nodes) {
+  //   std::cout << n.x << n.y << std::endl;
+  // }
+  // for (Elem e : elems) {
+  //   std::cout << e[0] << e[1] << e[2] << std::endl;
+  // }
+  // for (size_t t : u_indices) {
+  //   std::cout << t << std::endl;
+  // }
+  // for (double t : u_initial) {
+  //   std::cout << t << std::endl;
+  // }
+  // std::cout << F << std::endl;
   int dofs = nodes.size() * 2;
 
   MatrixXd K = MatrixXd::Zero(dofs, dofs);

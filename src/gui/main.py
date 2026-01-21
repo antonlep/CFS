@@ -74,24 +74,29 @@ class MainWindow(QMainWindow):
         layout1.addWidget(self.plotter.interactor)
 
     def the_button_was_clicked(self):
-        box1 = self.box1.value()
-        box2 = self.box2.value()
-        box3 = self.box3.value()
         box4 = self.box4.value()
         nodes = [[0, 0], [0, 10], [20, 10], [20, 0], [30, 0], [30, 10]]
         elements = [[0, 2, 1], [0, 3, 2], [2, 3, 5], [3, 4, 5]]
         fixed = [0, 1, 2, 3]
         displacements = [0, 0, 0, 0]
-        forces = [0, 0, 0, 0, box4, box4]
+        forces = [0, 0, 0, 0, 0, 0, 0, 0, box4, 0, box4, 0]
+        cells = []
+        for e in elements:
+            cells.extend([3, *e])
+        celltypes = [pv.CellType.TRIANGLE] * len(elements)
+        points = [[x, y, 0.0] for x, y in nodes]
+        grid = pv.UnstructuredGrid(cells, celltypes, points)
+        # grid.plot(show_edges=True)
         result = solver.solve_from_data(nodes, elements, fixed, displacements, forces)
         self.label.setText(str(result))
         print(f"Result: {result}")
-        grid = pv.ImageData()
-        grid.dimensions = (box1 + 1, box2 + 1, box3 + 1)
+        # grid = pv.ImageData()
+        # grid.dimensions = (box1 + 1, box2 + 1, box3 + 1)
 
-        grid.origin = (0, 0, 0)  # The bottom left corner of the data set
-        grid.spacing = (1, 1, 1)  # These are the cell sizes along each axis
+        # grid.origin = (0, 0, 0)  # The bottom left corner of the data set
+        # grid.spacing = (1, 1, 1)  # These are the cell sizes along each axis
         self.plotter.clear()
+        self.plotter.add_axes_at_origin()
         self.plotter.add_mesh(grid, show_edges=True)
 
 
