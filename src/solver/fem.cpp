@@ -112,7 +112,7 @@ make_input_from_parameters(const std::vector<std::vector<double>> &node_coords,
   return input;
 };
 
-double solve(const SolverInput &input) {
+std::vector<std::vector<double>> solve(const SolverInput &input) {
   double E = 210E6;
   double v = 0.3;
   double t = 1;
@@ -195,30 +195,31 @@ double solve(const SolverInput &input) {
   std::cout << "u\n";
   std::cout << u << "\n";
   std::cout << "\n";
-
+  std::vector<std::vector<double>> result;
   for (int i = 0; i < elems.size(); i++) {
     VectorXd S = element_stress(E, v, t, nodes, elems[i], u);
     std::cout << "stress element " << i << "\n";
     std::cout << S << "\n";
     std::cout << "\n";
+    std::vector<double> S_e(S.data(), S.data() + S.size());
+    result.push_back(S_e);
   }
-
-  return u_nonzero(0);
+  return result;
 }
 
-double solve_from_data(const std::vector<std::vector<double>> &node_coords,
-                       const std::vector<std::vector<int>> &elements,
-                       const std::vector<int> &u_indices,
-                       const std::vector<double> &u,
-                       const std::vector<double> &f) {
+std::vector<std::vector<double>>
+solve_from_data(const std::vector<std::vector<double>> &node_coords,
+                const std::vector<std::vector<int>> &elements,
+                const std::vector<int> &u_indices, const std::vector<double> &u,
+                const std::vector<double> &f) {
   SolverInput input =
       make_input_from_parameters(node_coords, elements, u_indices, u, f);
-  double res = solve(input);
+  std::vector<std::vector<double>> res = solve(input);
   return res;
 };
 
-double solve_from_file(const std::string &path) {
+std::vector<std::vector<double>> solve_from_file(const std::string &path) {
   SolverInput input = make_input_from_file(path);
-  double res = solve(input);
+  std::vector<std::vector<double>> res = solve(input);
   return res;
 };

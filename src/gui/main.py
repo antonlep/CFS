@@ -45,12 +45,6 @@ class MainWindow(QMainWindow):
         self.box2.setValue(20)
         layout2.addWidget(self.box2)
 
-        label3 = QLabel("thickness:")
-        layout2.addWidget(label3)
-        self.box3 = QSpinBox()
-        self.box3.setValue(1)
-        layout2.addWidget(self.box3)
-
         label4 = QLabel("force:")
         layout2.addWidget(label4)
         self.box4 = QSpinBox()
@@ -74,30 +68,33 @@ class MainWindow(QMainWindow):
         layout1.addWidget(self.plotter.interactor)
 
     def the_button_was_clicked(self):
-        box4 = self.box4.value()
-        nodes = [[0, 0], [0, 10], [20, 10], [20, 0], [30, 0], [30, 10]]
+        height = self.box1.value()
+        width = self.box2.value()
+        force = self.box4.value()
+        nodes = [
+            [0, 0],
+            [0, height],
+            [width / 2, height],
+            [width / 2, 0],
+            [width, 0],
+            [width, height],
+        ]
         elements = [[0, 2, 1], [0, 3, 2], [2, 3, 5], [3, 4, 5]]
         fixed = [0, 1, 2, 3]
         displacements = [0, 0, 0, 0]
-        forces = [0, 0, 0, 0, 0, 0, 0, 0, box4, 0, box4, 0]
+        forces = [0, 0, 0, 0, 0, 0, 0, 0, force / 2, 0, force / 2, 0]
         cells = []
         for e in elements:
             cells.extend([3, *e])
         celltypes = [pv.CellType.TRIANGLE] * len(elements)
         points = [[x, y, 0.0] for x, y in nodes]
         grid = pv.UnstructuredGrid(cells, celltypes, points)
-        # grid.plot(show_edges=True)
-        result = solver.solve_from_data(nodes, elements, fixed, displacements, forces)
-        self.label.setText(str(result))
-        print(f"Result: {result}")
-        # grid = pv.ImageData()
-        # grid.dimensions = (box1 + 1, box2 + 1, box3 + 1)
-
-        # grid.origin = (0, 0, 0)  # The bottom left corner of the data set
-        # grid.spacing = (1, 1, 1)  # These are the cell sizes along each axis
+        results = solver.solve_from_data(nodes, elements, fixed, displacements, forces)
+        cell_scalars = [i[0] for i in results]
+        grid.cell_data["Stress"] = cell_scalars
         self.plotter.clear()
         self.plotter.add_axes_at_origin()
-        self.plotter.add_mesh(grid, show_edges=True)
+        self.plotter.add_mesh(grid, show_edges=True, scalars="Stress", cmap="rainbow")
 
 
 app = QApplication(sys.argv)
