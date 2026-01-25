@@ -35,19 +35,21 @@ install(
   DESTINATION solver
 )
 
-find_package(Catch2 3 REQUIRED)
+if (CFS_BUILD_TESTS)
+    find_package(Catch2 3 REQUIRED)
 
-add_executable(solver_tests
-    tests/test_fem_basic.cpp
-)
+    add_executable(solver_tests
+        tests/test_fem_basic.cpp
+    )
 
-target_link_libraries(solver_tests
-    PRIVATE
-        solver_core
-        Catch2::Catch2WithMain
-)
+    target_link_libraries(solver_tests
+        PRIVATE
+            solver_core
+            Catch2::Catch2WithMain
+    )
 
-add_test(NAME solver_tests COMMAND solver_tests)
+    add_test(NAME solver_tests COMMAND solver_tests)
+endif()
 
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
