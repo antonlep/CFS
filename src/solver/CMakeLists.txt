@@ -49,6 +49,13 @@ if (CFS_BUILD_TESTS)
     )
 
     add_test(NAME solver_tests COMMAND solver_tests)
+
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(solver_tests PRIVATE
+            -fsanitize=address,undefined
+        )
+    endif()
 endif()
 
 
@@ -60,10 +67,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 
     target_link_options(solver_core PRIVATE
-        -fsanitize=address,undefined
-    )
-
-    target_link_options(solver_tests PRIVATE
         -fsanitize=address,undefined
     )
 
