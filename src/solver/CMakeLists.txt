@@ -1,8 +1,21 @@
 cmake_minimum_required(VERSION 3.18)
 project(solver LANGUAGES CXX)
 
-find_package(pybind11 REQUIRED)
+# -------------------------
+# pybind11 (always fetched, never manual)
+# -------------------------
+include(FetchContent)
 
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG v3.0.1
+)
+FetchContent_MakeAvailable(pybind11)
+
+# -------------------------
+# Core C++ library
+# -------------------------
 add_library(solver_core
     core/fem_element.cpp
     core/fem_solve.cpp
@@ -19,24 +32,35 @@ target_include_directories(solver_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen
 )
 
+target_compile_features(solver_core PUBLIC cxx_std_20)
+
+# -------------------------
+# Python extension module
+# -------------------------
 pybind11_add_module(_solver
     bindings.cpp
 )
 
 target_link_libraries(_solver PRIVATE solver_core)
 
+# -------------------------
+# Install for Python
+# -------------------------
 install(
   TARGETS _solver
   LIBRARY DESTINATION solver
 )
 
 install(
-  FILES ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
+  FILES __init__.py
   DESTINATION solver
 )
 
+# -------------------------
+# Tests (optional)
+# -------------------------
 if (CFS_BUILD_TESTS)
-    find_package(Catch2 3 REQUIRED)
+    add_subdirectory(third_party/Catch2)
 
     add_executable(solver_tests
         tests/test_fem_basic.cpp
@@ -50,32 +74,28 @@ if (CFS_BUILD_TESTS)
 
     add_test(NAME solver_tests COMMAND solver_tests)
 
-
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_options(solver_tests PRIVATE
-            -fsanitize=address,undefined
-        )
-    endif()
+    include(Catch)
+    catch_discover_tests(solver_tests)
 endif()
 
-
+# -------------------------
+# Debug sanitizers
+# -------------------------
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(solver_core PRIVATE
-        -fsanitize=address,undefined
-        -fno-omit-frame-pointer
-        -g
-    )
-
-    target_link_options(solver_core PRIVATE
-        -fsanitize=address,undefined
-    )
-
-    target_compile_options(_solver PRIVATE
-    -fsanitize=address,undefined
-    -fno-omit-frame-pointer
-    )
-
-    target_link_options(_solver PRIVATE
-        -fsanitize=address,undefined
-    )
+    if (UNIX AND NOT APPLE)
+        # Linux / WSL: sanitizers OK
+        foreach(tgt solver_core _solver)
+            target_compile_options(${tgt} PRIVATE
+                -g
+                -fno-omit-frame-pointer
+                -fsanitize=address,undefined
+            )
+            target_link_options(${tgt} PRIVATE
+                -fsanitize=address,undefined
+            )
+        endforeach()
+    else()
+        # Windows: NO sanitizers
+        message(STATUS "Debug build on Windows: sanitizers disabled")
+    endif()
 endif()
