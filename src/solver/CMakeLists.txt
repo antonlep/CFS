@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.19)
 project(solver LANGUAGES CXX)
 
 # -------------------------
@@ -60,11 +60,16 @@ install(
 # Tests (optional)
 # -------------------------
 if (CFS_BUILD_TESTS)
-    add_subdirectory(third_party/Catch2)
+    include(FetchContent)
 
-    add_executable(solver_tests
-        tests/test_fem_basic.cpp
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.2
     )
+    FetchContent_MakeAvailable(Catch2)
+
+    add_executable(solver_tests tests/test_fem_basic.cpp)
 
     target_link_libraries(solver_tests
         PRIVATE
@@ -72,12 +77,9 @@ if (CFS_BUILD_TESTS)
             Catch2::Catch2WithMain
     )
 
-    add_test(NAME solver_tests COMMAND solver_tests)
-
     include(Catch)
     catch_discover_tests(solver_tests)
 endif()
-
 # -------------------------
 # Debug sanitizers
 # -------------------------
