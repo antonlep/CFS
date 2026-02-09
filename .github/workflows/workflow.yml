@@ -18,9 +18,13 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -e .
 
+      - name: Install pybind11
+        run: pip install pybind11
+
       - name: Configure cmake
         run: |
           cmake -S . -B build \
+            -DCFS_FETCH_PYBIND11=OFF \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCFS_BUILD_TESTS=ON
 

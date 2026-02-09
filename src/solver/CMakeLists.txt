@@ -4,6 +4,8 @@ project(solver LANGUAGES CXX)
 # -------------------------
 # pybind11 (always fetched, never manual)
 # -------------------------
+find_package(pybind11 CONFIG REQUIRED)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -11,7 +13,12 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/pybind/pybind11.git
   GIT_TAG v3.0.1
 )
-FetchContent_MakeAvailable(pybind11)
+
+option(CFS_FETCH_PYBIND11 "Fetch pybind11 if not found" ON)
+
+if (CFS_FETCH_PYBIND11)
+  FetchContent_MakeAvailable(pybind11)
+endif()
 
 # -------------------------
 # Core C++ library
