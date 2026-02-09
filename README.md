@@ -11,8 +11,16 @@ cmake --build build-dev
 ctest --test-dir build-dev --verbose
 pytest tests -v
 
-CI
+(CI)
 pip install -e . --config-settings=cmake.define.CFS_BUILD_TESTS=ON
 ctest --test-dir _skbuild/*/build --verbose
 pytest tests -v
+
+local
+ninja -C build-dev solver_cli
+build-dev\src\solver\solver_cli.exe examples\fem.inp
+
+CI
+cmake --build build-dev --config Release
+ctest --test-dir build-dev --output-on-failure
 ```

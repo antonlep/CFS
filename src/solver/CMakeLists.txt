@@ -19,6 +19,7 @@ FetchContent_MakeAvailable(pybind11)
 add_library(solver_core
     core/fem_element.cpp
     core/fem_solve.cpp
+    core/householder.cpp
     io/read_file.cpp
     api/solver_api.cpp
 )
@@ -80,6 +81,19 @@ if (CFS_BUILD_TESTS)
     include(Catch)
     catch_discover_tests(solver_tests)
 endif()
+
+add_executable(solver_cli
+    solver_cli.cpp
+)
+
+target_link_libraries(solver_cli
+    PRIVATE solver_core
+)
+
+target_include_directories(solver_cli PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 # -------------------------
 # Debug sanitizers
 # -------------------------
