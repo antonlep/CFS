@@ -27,10 +27,10 @@ jobs:
             -DCFS_BUILD_TESTS=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$(python - << 'EOF'
-import pybind11, sys
-print(pybind11.get_cmake_dir())
-EOF
-)"
+      import pybind11, sys
+      print(pybind11.get_cmake_dir())
+      EOF
+      )"
 
       - name: Clang-format
         run: |
