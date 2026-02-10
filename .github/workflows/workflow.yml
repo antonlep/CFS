@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang clang-tidy clang-format cmake catch2
-          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip setuptools wheel pybind11 scikit-build-core
           pip install pybind11 scikit-build-core
           pip install -e .
 
@@ -25,7 +25,12 @@ jobs:
             -DCFS_FETCH_PYBIND11=OFF \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCFS_BUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(python - << 'EOF'
+import pybind11, sys
+print(pybind11.get_cmake_dir())
+EOF
+)"
 
       - name: Clang-format
         run: |
