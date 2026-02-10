@@ -24,9 +24,6 @@ if (NOT pybind11_FOUND)
   endif()
 endif()
 
-# Your module
-pybind11_add_module(_solver src/solver/bindings.cpp)
-
 # -------------------------
 # Core C++ library
 # -------------------------
