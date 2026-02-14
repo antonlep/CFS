@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QComboBox,
     QFormLayout,
+    QCheckBox,
 )
 
 from solver_helpers import solve_from_raw
@@ -63,6 +64,10 @@ class MainWindow(QMainWindow):
         self.result_combo.addItems(
             ["stress x", "stress y", "shear xy", "disp x", "disp y"]
         )
+        self.scale_box = self._spinbox(default=1000, step=500, max_val=10000)
+        self.mesh_box = QCheckBox()
+        controls_layout.addRow("Scale factor", self.scale_box)
+        controls_layout.addRow("Display mesh", self.mesh_box)
         controls_layout.addRow("Plot", self.result_combo)
 
         self.solve_button = QPushButton("Solve")
@@ -86,6 +91,8 @@ class MainWindow(QMainWindow):
         self.fx_box.valueChanged.connect(self.schedule_solve)
         self.fy_box.valueChanged.connect(self.schedule_solve)
         self.result_combo.currentIndexChanged.connect(self.schedule_solve)
+        self.scale_box.valueChanged.connect(self.schedule_solve)
+        self.mesh_box.stateChanged.connect(self.schedule_solve)
 
     @staticmethod
     def _spinbox(default=0, step=1, min_val=0, max_val=100000):
@@ -107,11 +114,15 @@ class MainWindow(QMainWindow):
             force_y=self.fy_box.value(),
         )
 
+    def _read_options(self) -> LoadParams:
+        return self.scale_box.value(), self.mesh_box.isChecked()
+
     def solve(self):
         if self.height_box.value() <= 0 or self.width_box.value() <= 0:
             return
         geom = self._read_geometry()
         loads = self._read_loads()
+        scale, show_mesh = self._read_options()
 
         nodes, elements = self._build_mesh(geom)
         fixed, displacements, forces = self._build_bc(loads, len(nodes))
@@ -129,7 +140,6 @@ class MainWindow(QMainWindow):
             return
 
         grid = self._build_grid(nodes, elements)
-        scale = 1000  # exaggeration factor
         points = []
         for (x, y), (ux, uy) in zip(nodes, results.disp):
             points.append([x + scale * ux, y + scale * uy, 0.0])
@@ -141,10 +151,21 @@ class MainWindow(QMainWindow):
         self.plotter.add_axes_at_origin()
         self.plotter.add_mesh(
             grid,
-            show_edges=True,
+            show_edges=False,
             scalars=self.result_combo.currentText(),
             cmap="rainbow",
         )
+        element_edges = grid.extract_all_edges()
+        outer_edges = grid.extract_feature_edges(
+            boundary_edges=True,
+            feature_edges=False,
+            manifold_edges=False,
+            non_manifold_edges=False,
+        )
+        if show_mesh:
+            self.plotter.add_mesh(element_edges, color="black", line_width=2)
+        else:
+            self.plotter.add_mesh(outer_edges, color="black", line_width=2)
 
     def _build_mesh(self, geom: GeometryParams):
         h, w = geom.height, geom.width

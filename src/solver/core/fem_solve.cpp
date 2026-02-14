@@ -66,13 +66,6 @@ SolverOutput fem_solve(const SolverInput &input) {
 
   SolverOutput out;
 
-  // for (const auto &e : input.elements) {
-  //   auto stresses = element_stress_lst(E, nu, input.nodes, e, u);
-  //   for (const auto &s : stresses) {
-  //     out.stress.push_back(s);
-  //   }
-  // }
-
   std::vector<Eigen::Vector3d> nodal_stress(input.nodes.size(),
                                             Eigen::Vector3d::Zero());
   std::vector<int> counter(input.nodes.size(), 0);
@@ -81,8 +74,6 @@ SolverOutput fem_solve(const SolverInput &input) {
 
     auto sg = compute_gauss_stress_lst(E, nu, input.nodes, e, u);
     auto sn = extrapolate_to_nodes(sg);
-    for (int i = 0; i < 3; ++i)
-      std::cout << sg[i].transpose() << std::endl;
 
     for (int i = 0; i < 6; ++i) {
       int gid = e[i];
