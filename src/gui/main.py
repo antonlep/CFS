@@ -176,14 +176,14 @@ class MainWindow(QMainWindow):
         return nodes, elements
 
     def _build_bc(self, loads: LoadParams, n_nodes: int):
-        fixed = [0, 1, 2, 3, 4, 5]
-        displacements = [0, 0, 0, 0, 0, 0]
+        fixed = [0, 1, 2, 4]
+        displacements = [0, 0, 0, 0]
 
-        fx = loads.force_x / 2
-        fy = loads.force_y / 2
+        fx = loads.force_x / 6
+        fy = loads.force_y / 6
 
         forces = [0.0] * (2 * n_nodes)
-        forces[-6:] = [fx, fy, fx, fy, fx, fy]
+        forces[-6:] = [fx, fy, 4 * fx, 4 * fy, fx, fy]
 
         return fixed, displacements, forces
 
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
     def _apply_results(self, grid, results):
         name = self.result_combo.currentText()
 
-        if name.startswith("stress"):
+        if name.startswith("stress") or name.startswith("shear"):
             idx = {"stress x": 0, "stress y": 1, "shear xy": 2}[name]
             grid.point_data[name] = [s[idx] for s in results.stress]
 
