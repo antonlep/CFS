@@ -47,10 +47,11 @@ SolverInput read_file(const char *filename) {
       }
       if (read == true) {
         std::istringstream iss(str);
-        int n1, n2, n3;
+        int n1, n2, n3, n4, n5, n6;
         char sep = ',';
-        iss >> n1 >> sep >> n2 >> sep >> n3;
-        elems.push_back(Element{n1, n2, n3});
+        iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> n4 >> sep >> n5 >> sep >>
+            n6;
+        elems.push_back(Element{n1, n2, n3, n4, n5, n6});
       }
     }
     myfile.clear();

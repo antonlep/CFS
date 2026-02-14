@@ -3,10 +3,11 @@
 #include "householder.h"
 #include <Eigen/Dense>
 #include <cassert>
+#include <iostream>
 #include <unordered_set>
 
 SolverOutput fem_solve(const SolverInput &input) {
-  constexpr double E = 210e9;
+  constexpr double E = 210e6;
   constexpr double nu = 0.3;
   constexpr double t = 1.0;
 
@@ -15,9 +16,9 @@ SolverOutput fem_solve(const SolverInput &input) {
   Eigen::MatrixXd K = Eigen::MatrixXd::Zero(ndof, ndof);
 
   for (const auto &e : input.elements) {
-    auto ke = element_stiffness(E, nu, t, input.nodes, e);
-    for (size_t i = 0; i < 3; i++)
-      for (size_t j = 0; j < 3; j++)
+    auto ke = element_stiffness_lst(E, nu, t, input.nodes, e);
+    for (size_t i = 0; i < 6; i++)
+      for (size_t j = 0; j < 6; j++)
         K.block<2, 2>(2 * e[i], 2 * e[j]) += ke.block<2, 2>(2 * i, 2 * j);
   }
 
@@ -65,9 +66,39 @@ SolverOutput fem_solve(const SolverInput &input) {
 
   SolverOutput out;
 
+  // for (const auto &e : input.elements) {
+  //   auto stresses = element_stress_lst(E, nu, input.nodes, e, u);
+  //   for (const auto &s : stresses) {
+  //     out.stress.push_back(s);
+  //   }
+  // }
+
+  std::vector<Eigen::Vector3d> nodal_stress(input.nodes.size(),
+                                            Eigen::Vector3d::Zero());
+  std::vector<int> counter(input.nodes.size(), 0);
+
   for (const auto &e : input.elements) {
-    Eigen::Vector3d s = element_stress(E, nu, input.nodes, e, u);
-    out.stress.push_back({s[0], s[1], s[2]});
+
+    auto sg = compute_gauss_stress_lst(E, nu, input.nodes, e, u);
+    auto sn = extrapolate_to_nodes(sg);
+    for (int i = 0; i < 3; ++i)
+      std::cout << sg[i].transpose() << std::endl;
+
+    for (int i = 0; i < 6; ++i) {
+      int gid = e[i];
+      nodal_stress[gid] += sn[i];
+      counter[gid]++;
+    }
+  }
+
+  for (size_t i = 0; i < nodal_stress.size(); ++i)
+    if (counter[i] > 0)
+      nodal_stress[i] /= counter[i];
+
+  out.stress.reserve(nodal_stress.size());
+
+  for (const auto &s : nodal_stress) {
+    out.stress.push_back({s(0), s(1), s(2)});
   }
 
   for (size_t i = 0; i < input.nodes.size(); i++)

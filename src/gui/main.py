@@ -129,6 +129,12 @@ class MainWindow(QMainWindow):
             return
 
         grid = self._build_grid(nodes, elements)
+        scale = 1000  # exaggeration factor
+        points = []
+        for (x, y), (ux, uy) in zip(nodes, results.disp):
+            points.append([x + scale * ux, y + scale * uy, 0.0])
+
+        grid.points = points
         self._apply_results(grid, results)
 
         self.plotter.clear()
@@ -145,40 +151,48 @@ class MainWindow(QMainWindow):
 
         nodes = [
             [0, 0],
+            [0, h / 2],
             [0, h],
-            [w / 2, h],
-            [w / 2, 0],
-            [w, 0],
-            [w, h],
+            [w / 4, 0],
+            [w / 4, h / 2],
+            [w / 4, h],
+            [2 * w / 4, 0],
+            [2 * w / 4, h / 2],
+            [2 * w / 4, h],
+            [3 * w / 4, 0],
+            [3 * w / 4, h / 2],
+            [3 * w / 4, h],
+            [4 * w / 4, 0],
+            [4 * w / 4, h / 2],
+            [4 * w / 4, h],
         ]
-
         elements = [
-            [0, 2, 1],
-            [0, 3, 2],
-            [2, 3, 5],
-            [3, 4, 5],
+            [0, 8, 2, 4, 5, 1],
+            [0, 6, 8, 3, 7, 4],
+            [6, 12, 14, 9, 13, 10],
+            [6, 14, 8, 10, 11, 7],
         ]
 
         return nodes, elements
 
     def _build_bc(self, loads: LoadParams, n_nodes: int):
-        fixed = [0, 1, 2, 3]
-        displacements = [0, 0, 0, 0]
+        fixed = [0, 1, 2, 3, 4, 5]
+        displacements = [0, 0, 0, 0, 0, 0]
 
         fx = loads.force_x / 2
         fy = loads.force_y / 2
 
         forces = [0.0] * (2 * n_nodes)
-        forces[-4:] = [fx, fy, fx, fy]
+        forces[-6:] = [fx, fy, fx, fy, fx, fy]
 
         return fixed, displacements, forces
 
     def _build_grid(self, nodes, elements):
         cells = []
         for e in elements:
-            cells.extend([3, *e])
+            cells.extend([6, *e])
 
-        celltypes = [pv.CellType.TRIANGLE] * len(elements)
+        celltypes = [pv.CellType.QUADRATIC_TRIANGLE] * len(elements)
         points = [[x, y, 0.0] for x, y in nodes]
 
         return pv.UnstructuredGrid(cells, celltypes, points)
@@ -188,7 +202,7 @@ class MainWindow(QMainWindow):
 
         if name.startswith("stress"):
             idx = {"stress x": 0, "stress y": 1, "shear xy": 2}[name]
-            grid.cell_data[name] = [s[idx] for s in results.stress]
+            grid.point_data[name] = [s[idx] for s in results.stress]
 
         else:  # displacement
             idx = {"disp x": 0, "disp y": 1}[name]

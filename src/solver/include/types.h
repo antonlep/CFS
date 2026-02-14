@@ -7,7 +7,7 @@ struct Node {
   double y;
 };
 
-using Element = std::array<int, 3>;
+using Element = std::array<int, 6>;
 using Nodes = std::vector<Node>;
 using Elements = std::vector<Element>;
 
