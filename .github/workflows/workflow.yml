@@ -46,7 +46,7 @@ jobs:
 
       - name: Clang-tidy
         run: |
-          clang-tidy src/solver/*.cpp -p build
+          clang-tidy src/solver/*.cpp -p build-release
 
       - name: Black
         run: |
