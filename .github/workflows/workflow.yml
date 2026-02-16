@@ -21,7 +21,8 @@ jobs:
 
       - name: Configure cmake
         run: |
-          cmake -S . -B build \
+          cmake -S . -B build-release \
+            -G Ninja \
             -DCFS_FETCH_PYBIND11=OFF \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCFS_BUILD_TESTS=ON \
@@ -31,6 +32,12 @@ jobs:
           print(pybind11.get_cmake_dir())
           EOF
           )"
+          cmake --build build-release
+
+      - name: Test
+        run: |
+          ctest --test-dir build-release --output-on-failure
+          pytest tests -v
 
       - name: Clang-format
         run: |
