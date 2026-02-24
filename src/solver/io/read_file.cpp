@@ -19,18 +19,19 @@ SolverInput read_file(const char *filename) {
     std::string str;
     bool read = false;
     while (std::getline(myfile, str)) {
-      if (str.rfind("nodes", 0) == 0) {
+      if (str.rfind("*NODE", 0) == 0) {
         read = true;
         std::getline(myfile, str);
       }
-      if (str == "") {
+      if (str.rfind("*ELEMENT", 0) == 0) {
         read = false;
       }
       if (read == true) {
         std::istringstream iss(str);
+        int l;
         double x, y;
         char sep = ',';
-        iss >> x >> sep >> y;
+        iss >> l >> sep >> x >> sep >> y;
         nodes.push_back(Node{x, y});
       }
     }
@@ -38,19 +39,19 @@ SolverInput read_file(const char *filename) {
     myfile.seekg(0);
     read = false;
     while (std::getline(myfile, str)) {
-      if (str.rfind("elements", 0) == 0) {
+      if (str.rfind("*ELEMENT", 0) == 0) {
         read = true;
         std::getline(myfile, str);
       }
-      if (str == "") {
+      if (str.rfind("*BOUNDARY", 0) == 0) {
         read = false;
       }
       if (read == true) {
         std::istringstream iss(str);
-        int n1, n2, n3, n4, n5, n6;
+        int l, n1, n2, n3, n4, n5, n6;
         char sep = ',';
-        iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> n4 >> sep >> n5 >> sep >>
-            n6;
+        iss >> l >> sep >> n1 >> sep >> n2 >> sep >> n3 >> sep >> n4 >> sep >>
+            n5 >> sep >> n6;
         elems.push_back(Element{n1, n2, n3, n4, n5, n6});
       }
     }
@@ -58,11 +59,11 @@ SolverInput read_file(const char *filename) {
     myfile.seekg(0);
     read = false;
     while (std::getline(myfile, str)) {
-      if (str.rfind("displacements", 0) == 0) {
+      if (str.rfind("*BOUNDARY", 0) == 0) {
         read = true;
         std::getline(myfile, str);
       }
-      if (str == "") {
+      if (str.rfind("*FORCE", 0) == 0) {
         read = false;
       }
       if (read == true) {
@@ -80,7 +81,7 @@ SolverInput read_file(const char *filename) {
     read = false;
     F.insert(F.begin(), nodes.size() * 2, 0);
     while (std::getline(myfile, str)) {
-      if (str.rfind("forces", 0) == 0) {
+      if (str.rfind("*FORCE", 0) == 0) {
         read = true;
         std::getline(myfile, str);
       }

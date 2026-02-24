@@ -22,7 +22,8 @@ dependencies = [
     "ninja==1.13",
     "pybind11>=3.0,<4.0",
     "pytest==9.0",
-    "scikit_build_core>=0.11,<0.12"
+    "scikit_build_core>=0.11,<0.12",
+    "gmsh==4.15"
 ]
 
 [tool.setuptools]
