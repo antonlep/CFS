@@ -1,5 +1,6 @@
 import sys
 from dataclasses import dataclass
+from mesh import create_mesh
 
 import pyvista as pv
 import pyvistaqt as pvqt
@@ -55,18 +56,31 @@ class MainWindow(QMainWindow):
         controls_layout.addRow("Height", self.height_box)
         controls_layout.addRow("Width", self.width_box)
 
-        self.fx_box = self._spinbox(default=5000, step=5000, max_val=50000)
-        self.fy_box = self._spinbox(default=5000, step=5000, max_val=50000)
+        self.fx_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self.fy_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self.size_box = self._spinbox(default=10, step=1, max_val=100)
+        self.max_box = self._spinbox(
+            default=100, step=10, max_val=10000, min_val=-10000
+        )
+        self.min_box = self._spinbox(
+            default=-100, step=10, max_val=10000, min_val=-10000
+        )
         controls_layout.addRow("Force X", self.fx_box)
         controls_layout.addRow("Force Y", self.fy_box)
+        controls_layout.addRow("Mesh size", self.size_box)
 
         self.result_combo = QComboBox()
         self.result_combo.addItems(
             ["stress x", "stress y", "shear xy", "disp x", "disp y"]
         )
         self.scale_box = self._spinbox(default=1000, step=500, max_val=10000)
+        self.auto_box = QCheckBox()
+        self.auto_box.setChecked(True)
         self.mesh_box = QCheckBox()
         controls_layout.addRow("Scale factor", self.scale_box)
+        controls_layout.addRow("Scale max", self.max_box)
+        controls_layout.addRow("Scale min", self.min_box)
+        controls_layout.addRow("Auto scale", self.auto_box)
         controls_layout.addRow("Display mesh", self.mesh_box)
         controls_layout.addRow("Plot", self.result_combo)
 
@@ -90,9 +104,13 @@ class MainWindow(QMainWindow):
         self.width_box.valueChanged.connect(self.schedule_solve)
         self.fx_box.valueChanged.connect(self.schedule_solve)
         self.fy_box.valueChanged.connect(self.schedule_solve)
+        self.size_box.valueChanged.connect(self.schedule_solve)
         self.result_combo.currentIndexChanged.connect(self.schedule_solve)
         self.scale_box.valueChanged.connect(self.schedule_solve)
         self.mesh_box.stateChanged.connect(self.schedule_solve)
+        self.auto_box.stateChanged.connect(self.schedule_solve)
+        self.max_box.valueChanged.connect(self.schedule_solve)
+        self.min_box.valueChanged.connect(self.schedule_solve)
 
     @staticmethod
     def _spinbox(default=0, step=1, min_val=0, max_val=100000):
@@ -115,18 +133,101 @@ class MainWindow(QMainWindow):
         )
 
     def _read_options(self) -> LoadParams:
-        return self.scale_box.value(), self.mesh_box.isChecked()
+        return (
+            self.scale_box.value(),
+            self.mesh_box.isChecked(),
+            self.size_box.value(),
+            self.min_box.value(),
+            self.max_box.value(),
+            self.auto_box.isChecked(),
+        )
+
+    def _get_nodes_by_name(self, model, group_name):
+        # Get all physical groups: list of (dim, tag)
+        groups = model.getPhysicalGroups()
+
+        for dim, tag in groups:
+            # Check if this tag's name matches our target
+            if model.getPhysicalName(dim, tag) == group_name:
+                # Returns (nodeTags, coord, parametricCoord)
+                nodes = model.mesh.getNodesForPhysicalGroup(dim, tag)
+                return nodes
+
+    def _get_edge_nodes(self, model, group_name):
+        groups = model.getPhysicalGroups()
+        nodes = []
+        coords = []
+        for dim, tag in groups:
+            if model.getPhysicalName(dim, tag) == group_name:
+                entities = model.getEntitiesForPhysicalGroup(dim, tag)
+                types, elementTags, nodeTags = model.mesh.getElements(1, entities[0])
+                nodeTags = nodeTags[0]
+                nodeTags = [nodeTags[i : i + 3] for i in range(0, len(nodeTags), 3)]
+                for n in nodeTags:
+                    node_coords = []
+                    node_nodes = []
+                    for i in n:
+                        c = model.mesh.getNode(i)
+                        node_coords.append(float(c[0][1]))
+                        node_nodes.append(int(i))
+                    coords.append(node_coords)
+                    nodes.append(node_nodes)
+        return elementTags, nodes, coords
+
+    def _get_elements_by_name(self, model, group_name):
+        groups = model.getPhysicalGroups()
+
+        for dim, tag in groups:
+            if model.getPhysicalName(dim, tag) == group_name:
+
+                entities = model.getEntitiesForPhysicalGroup(dim, tag)
+
+                element_tags = []
+                element_nodes = []
+
+                for entity in entities:
+                    types, tags, nodes = model.mesh.getElements(dim, entity)
+
+                    for t in tags:
+                        tt = [int(i) for i in t]
+                        element_tags.extend(tt)
+
+                    for n in nodes:
+                        nn = [int(i) for i in n]
+                        element_nodes.extend(nn)
+
+                return element_tags, element_nodes
 
     def solve(self):
         if self.height_box.value() <= 0 or self.width_box.value() <= 0:
             return
         geom = self._read_geometry()
         loads = self._read_loads()
-        scale, show_mesh = self._read_options()
+        scale, show_mesh, mesh_size, scale_min, scale_max, auto_scale = (
+            self._read_options()
+        )
 
         nodes, elements = self._build_mesh(geom)
-        fixed, displacements, forces = self._build_bc(loads, len(nodes))
+        model = create_mesh(geom.width, geom.height, mesh_size)
+        nn, nodes = self._get_nodes_by_name(model, "ALL_NODES")
+        ee, elements = self._get_elements_by_name(model, "ALL_ELEMENTS")
+        element_tags, node_tags, node_coords = self._get_edge_nodes(model, "SIDE_NODES")
+        y_fixed, _ = self._get_nodes_by_name(model, "Y_FIXED")
+        x_fixed, _ = self._get_nodes_by_name(model, "X_FIXED")
 
+        nodes = [[nodes[i], nodes[i + 1]] for i in range(0, len(nodes), 3)]
+        elements = [elements[i : i + 6] for i in range(0, len(elements), 6)]
+        elements = [[n - 1 for n in e] for e in elements]
+
+        fixed, displacements, forces = self._build_bc(
+            loads, node_tags, node_coords, x_fixed, y_fixed, len(nodes)
+        )
+
+        print("nodes:")
+        print(len(nodes))
+        print("elements:")
+        print(len(elements))
+        print()
         try:
             results = solve_from_raw(
                 nodes,
@@ -149,12 +250,22 @@ class MainWindow(QMainWindow):
 
         self.plotter.clear()
         self.plotter.add_axes_at_origin()
-        self.plotter.add_mesh(
-            grid,
-            show_edges=False,
-            scalars=self.result_combo.currentText(),
-            cmap="rainbow",
-        )
+        if auto_scale:
+            self.plotter.add_mesh(
+                grid,
+                show_edges=False,
+                scalars=self.result_combo.currentText(),
+                cmap="rainbow",
+            )
+        else:
+            self.plotter.add_mesh(
+                grid,
+                show_edges=False,
+                scalars=self.result_combo.currentText(),
+                cmap="rainbow",
+                clim=[scale_min, scale_max],
+            )
+
         element_edges = grid.extract_all_edges()
         outer_edges = grid.extract_feature_edges(
             boundary_edges=True,
@@ -196,16 +307,46 @@ class MainWindow(QMainWindow):
 
         return nodes, elements
 
-    def _build_bc(self, loads: LoadParams, n_nodes: int):
-        fixed = [0, 1, 2, 4]
-        displacements = [0, 0, 0, 0]
-
-        fx = loads.force_x / 6
-        fy = loads.force_y / 6
-
+    def _build_bc(
+        self,
+        loads: LoadParams,
+        node_tags,
+        node_coords,
+        x_fixed,
+        y_fixed,
+        n_nodes: int,
+    ):
+        x_fixed_trans = [int((i - 1) * 2) for i in x_fixed]
+        y_fixed_trans = [int((i - 1) * 2 + 1) for i in y_fixed]
+        fixed = x_fixed_trans + y_fixed_trans
+        displacements = [0] * len(fixed)
+        min_y = 1e99
+        max_y = -1e99
+        for e in node_coords:
+            for n in e:
+                if n < min_y:
+                    min_y = n
+                if n > max_y:
+                    max_y = n
+        # height = max_y - min_y
         forces = [0.0] * (2 * n_nodes)
-        forces[-6:] = [fx, fy, 4 * fx, 4 * fy, fx, fy]
-
+        for i in range(0, len(node_coords)):
+            local_coords = node_coords[i]
+            min_node = local_coords.index(min(local_coords))
+            max_node = local_coords.index(max(local_coords))
+            # dist = local_coords[max_node] - local_coords[min_node]
+            # fx = loads.force_x * dist / height / 6
+            # fy = loads.force_y * dist / height / 6
+            fx = loads.force_x / len(node_coords) / 6
+            fy = loads.force_y / len(node_coords) / 6
+            for c in [0, 1, 2]:
+                label = node_tags[i][c]
+                if c == min_node or c == max_node:
+                    forces[(label - 1) * 2] += fx
+                    forces[(label - 1) * 2 + 1] += fy
+                else:
+                    forces[(label - 1) * 2] += 4 * fx
+                    forces[(label - 1) * 2 + 1] += 4 * fy
         return fixed, displacements, forces
 
     def _build_grid(self, nodes, elements):

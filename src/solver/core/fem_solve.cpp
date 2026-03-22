@@ -3,10 +3,12 @@
 #include "householder.h"
 #include <Eigen/Dense>
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <unordered_set>
 
 SolverOutput fem_solve(const SolverInput &input) {
+
   constexpr double E = 210e6;
   constexpr double nu = 0.3;
   constexpr double t = 1.0;
@@ -52,7 +54,8 @@ SolverOutput fem_solve(const SolverInput &input) {
   for (size_t i = 0; i < free.size(); i++)
     free_idx(i) = free[i];
 
-  Eigen::VectorXd u_free = householder(K(free_idx, free_idx), F(free_idx));
+  // Eigen::VectorXd u_free = householder(K(free_idx, free_idx), F(free_idx));
+  Eigen::VectorXd u_free = K(free_idx, free_idx).llt().solve(F(free_idx));
 
   Eigen::VectorXd u = Eigen::VectorXd::Zero(ndof);
   for (size_t i = 0; i < free.size(); i++)
