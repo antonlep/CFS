@@ -162,7 +162,9 @@ class MainWindow(QMainWindow):
                 entities = model.getEntitiesForPhysicalGroup(dim, tag)
                 types, elementTags, nodeTags = model.mesh.getElements(1, entities[0])
                 nodeTags = nodeTags[0]
-                nodeTags = [nodeTags[i : i + 3] for i in range(0, len(nodeTags), 3)]
+                nodeTags = [
+                    nodeTags[i : i + 3] for i in range(0, len(nodeTags), 3)  # noqa
+                ]
                 for n in nodeTags:
                     node_coords = []
                     node_nodes = []
@@ -216,7 +218,7 @@ class MainWindow(QMainWindow):
         x_fixed, _ = self._get_nodes_by_name(model, "X_FIXED")
 
         nodes = [[nodes[i], nodes[i + 1]] for i in range(0, len(nodes), 3)]
-        elements = [elements[i : i + 6] for i in range(0, len(elements), 6)]
+        elements = [elements[i : i + 6] for i in range(0, len(elements), 6)]  # noqa
         elements = [[n - 1 for n in e] for e in elements]
 
         fixed, displacements, forces = self._build_bc(
