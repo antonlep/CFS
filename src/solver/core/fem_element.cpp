@@ -5,6 +5,29 @@ static double area(const Node &a, const Node &b, const Node &c) {
   return 0.5 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
 }
 
+void shape_function_derivatives(double xi, double eta, double dN_dxi[6],
+                                double dN_deta[6]) {
+  double L1 = 1.0 - xi - eta;
+  double L2 = xi;
+  double L3 = eta;
+
+  // dN/dxi
+  dN_dxi[0] = -4 * L1 + 1;
+  dN_dxi[1] = 4 * L2 - 1;
+  dN_dxi[2] = 0.0;
+  dN_dxi[3] = 4 * (L1 - L2);
+  dN_dxi[4] = 4 * L3;
+  dN_dxi[5] = -4 * L3;
+
+  // dN/deta
+  dN_deta[0] = -4 * L1 + 1;
+  dN_deta[1] = 0.0;
+  dN_deta[2] = 4 * L3 - 1;
+  dN_deta[3] = -4 * L2;
+  dN_deta[4] = 4 * L2;
+  dN_deta[5] = 4 * (L1 - L3);
+}
+
 Eigen::Matrix<double, 6, 6> element_stiffness(double E, double nu, double t,
                                               const Nodes &nodes,
                                               const Element &e) {
@@ -57,20 +80,12 @@ Eigen::Vector3d element_stress(double E, double nu, const Nodes &nodes,
   return D * B * ue;
 }
 
-static void compute_B_LST(const Nodes &nodes, const Element &e, double xi,
-                          double eta, Eigen::Matrix<double, 3, 12> &B) {
-  // Shape function derivatives in natural coordinates
-  double L1 = 1.0 - xi - eta;
-  double L2 = xi;
-  double L3 = eta;
+void compute_B(const Nodes &nodes, const Element &e, double xi, double eta,
+               Eigen::Matrix<double, 3, 12> &B, double &detJ) {
 
-  double dN_dxi[6] = {-3 + 4 * L1,   4 * L2 - 1, 0,
-                      4 * (L1 - L2), 4 * L3,     -4 * L3};
+  double dN_dxi[6], dN_deta[6];
+  shape_function_derivatives(xi, eta, dN_dxi, dN_deta);
 
-  double dN_deta[6] = {-3 + 4 * L1, 0,      4 * L3 - 1,
-                       -4 * L2,     4 * L2, 4 * (L1 - L3)};
-
-  // Jacobian
   Eigen::Matrix2d J = Eigen::Matrix2d::Zero();
 
   for (int i = 0; i < 6; ++i) {
@@ -81,12 +96,12 @@ static void compute_B_LST(const Nodes &nodes, const Element &e, double xi,
     J(1, 1) += dN_deta[i] * n.y;
   }
 
+  detJ = J.determinant();
   Eigen::Matrix2d invJ = J.inverse();
 
   B.setZero();
 
   for (int i = 0; i < 6; ++i) {
-
     Eigen::Vector2d dN_nat(dN_dxi[i], dN_deta[i]);
     Eigen::Vector2d dN = invJ * dN_nat;
 
@@ -103,6 +118,7 @@ static void compute_B_LST(const Nodes &nodes, const Element &e, double xi,
 std::array<Eigen::Vector3d, 3>
 compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
                          const Element &e, const Eigen::VectorXd &u) {
+
   Eigen::Matrix<double, 12, 1> ue;
 
   for (int i = 0; i < 6; ++i) {
@@ -112,7 +128,6 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
 
   Eigen::Matrix3d D;
   D << 1, nu, 0, nu, 1, 0, 0, 0, (1 - nu) / 2;
-
   D *= E / (1 - nu * nu);
 
   const double xi[3] = {1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
@@ -121,9 +136,10 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
   std::array<Eigen::Vector3d, 3> stresses;
 
   for (int gp = 0; gp < 3; ++gp) {
-
     Eigen::Matrix<double, 3, 12> B;
-    compute_B_LST(nodes, e, xi[gp], eta[gp], B);
+    double detJ;
+
+    compute_B(nodes, e, xi[gp], eta[gp], B, detJ);
 
     stresses[gp] = D * B * ue;
   }
@@ -163,62 +179,24 @@ Eigen::Matrix<double, 12, 12> element_stiffness_lst(double E, double nu,
                                                     double t,
                                                     const Nodes &nodes,
                                                     const Element &e) {
+
   Eigen::Matrix<double, 12, 12> Ke = Eigen::Matrix<double, 12, 12>::Zero();
 
-  // Elasticity matrix (plane stress)
   Eigen::Matrix3d D;
   D << 1, nu, 0, nu, 1, 0, 0, 0, (1 - nu) / 2;
-
   D *= E / (1 - nu * nu);
 
-  // 3-point Gauss integration
   const double xi[3] = {1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
   const double eta[3] = {1.0 / 6.0, 1.0 / 6.0, 2.0 / 3.0};
   const double w = 1.0 / 6.0;
 
   for (int gp = 0; gp < 3; ++gp) {
-    double L1 = 1.0 - xi[gp] - eta[gp];
-    double L2 = xi[gp];
-    double L3 = eta[gp];
+    Eigen::Matrix<double, 3, 12> B;
+    double detJ;
 
-    // Shape function derivatives in natural coordinates
-    double dN_dxi[6] = {-(4 * L1 - 1), 4 * L2 - 1, 0.0,
-                        4 * (L1 - L2), 4 * L3,     -4 * L3};
+    compute_B(nodes, e, xi[gp], eta[gp], B, detJ);
 
-    double dN_deta[6] = {-(4 * L1 - 1), 0.0,    4 * L3 - 1,
-                         -4 * L2,       4 * L2, 4 * (L1 - L3)};
-
-    // Build Jacobian
-    Eigen::Matrix2d J = Eigen::Matrix2d::Zero();
-
-    for (int i = 0; i < 6; ++i) {
-      const Node &n = nodes[e[i]];
-      J(0, 0) += dN_dxi[i] * n.x;
-      J(0, 1) += dN_dxi[i] * n.y;
-      J(1, 0) += dN_deta[i] * n.x;
-      J(1, 1) += dN_deta[i] * n.y;
-    }
-
-    double detJ = J.determinant();
-    Eigen::Matrix2d invJ = J.inverse();
-
-    // Build B matrix (3x12)
-    Eigen::Matrix<double, 3, 12> B = Eigen::Matrix<double, 3, 12>::Zero();
-
-    for (int i = 0; i < 6; ++i) {
-      Eigen::Vector2d dN_nat(dN_dxi[i], dN_deta[i]);
-      Eigen::Vector2d dN = invJ * dN_nat;
-
-      double dNx = dN(0);
-      double dNy = dN(1);
-
-      B(0, 2 * i) = dNx;
-      B(1, 2 * i + 1) = dNy;
-      B(2, 2 * i) = dNy;
-      B(2, 2 * i + 1) = dNx;
-    }
-
-    Ke += t * (B.transpose() * D * B) * detJ * w;
+    Ke += t * B.transpose() * D * B * detJ * w;
   }
 
   return Ke;
