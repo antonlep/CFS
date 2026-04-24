@@ -25,6 +25,7 @@ SolverInput read_file(const char *filename) {
   std::vector<size_t> u_indices;
   std::vector<double> u;
   std::vector<double> F;
+  std::vector<BoundaryEdge> boundary_edges;
   std::unordered_map<int, int> node_id_to_index;
 
   if ((myfile.is_open()) && (myfile2.is_open())) {
@@ -144,7 +145,7 @@ SolverInput read_file(const char *filename) {
         read = true;
         std::getline(myfile, str);
       }
-      if (str == "") {
+      if (str.rfind("*", 0) == 0) {
         read = false;
       }
       if (read == true) {
@@ -200,6 +201,24 @@ SolverInput read_file(const char *filename) {
     myfile2.close();
   }
 
-  SolverInput input = {nodes, elems, u_indices, u, F};
+  BoundaryEdge boundary1;
+  boundary1.n1 = 0;
+  boundary1.n2 = 1;
+  boundary1.n3 = 2;
+  boundary1.h = 1000;
+  boundary1.Tinf = 300;
+
+  BoundaryEdge boundary2;
+  boundary2.n1 = 12;
+  boundary2.n2 = 13;
+  boundary2.n3 = 14;
+  boundary2.h = 1000;
+  boundary2.Tinf = 400;
+
+  boundary_edges.push_back(boundary1);
+  boundary_edges.push_back(boundary2);
+
+  SolverInput input = {nodes, elems, u_indices, u, F, boundary_edges};
+
   return input;
 }

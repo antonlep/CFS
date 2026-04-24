@@ -115,6 +115,34 @@ void compute_B(const Nodes &nodes, const Element &e, double xi, double eta,
   }
 }
 
+void compute_B_heat(const Nodes &nodes, const Element &e, double xi, double eta,
+                    Eigen::Matrix<double, 2, 6> &B, double &detJ) {
+
+  double dN_dxi[6], dN_deta[6];
+  shape_function_derivatives(xi, eta, dN_dxi, dN_deta);
+
+  Eigen::Matrix2d J = Eigen::Matrix2d::Zero();
+
+  for (int i = 0; i < 6; ++i) {
+    const Node &n = nodes[e[i]];
+    J(0, 0) += dN_dxi[i] * n.x;
+    J(0, 1) += dN_dxi[i] * n.y;
+    J(1, 0) += dN_deta[i] * n.x;
+    J(1, 1) += dN_deta[i] * n.y;
+  }
+
+  detJ = J.determinant();
+  Eigen::Matrix2d invJ = J.inverse();
+
+  for (int i = 0; i < 6; ++i) {
+    Eigen::Vector2d dN_nat(dN_dxi[i], dN_deta[i]);
+    Eigen::Vector2d dN = invJ * dN_nat;
+
+    B(0, i) = dN(0); // dN/dx
+    B(1, i) = dN(1); // dN/dy
+  }
+}
+
 std::array<Eigen::Vector3d, 3>
 compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
                          const Element &e, const Eigen::VectorXd &u) {
@@ -200,4 +228,76 @@ Eigen::Matrix<double, 12, 12> element_stiffness_lst(double E, double nu,
   }
 
   return Ke;
+}
+
+Eigen::Matrix<double, 6, 6> element_stiffness_heat(double k, double t,
+                                                   const Nodes &nodes,
+                                                   const Element &e) {
+
+  Eigen::Matrix<double, 6, 6> Ke = Eigen::Matrix<double, 6, 6>::Zero();
+
+  const double xi[3] = {1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
+  const double eta[3] = {1.0 / 6.0, 1.0 / 6.0, 2.0 / 3.0};
+  const double w = 1.0 / 6.0;
+
+  for (int gp = 0; gp < 3; ++gp) {
+    Eigen::Matrix<double, 2, 6> B;
+    double detJ;
+
+    compute_B_heat(nodes, e, xi[gp], eta[gp], B, detJ);
+
+    Ke += t * B.transpose() * k * B * detJ * w;
+  }
+
+  return Ke;
+}
+
+void shape_functions(double xi, double eta, double N[6]) {
+  double L1 = 1.0 - xi - eta;
+  double L2 = xi;
+  double L3 = eta;
+
+  N[0] = L1 * (2 * L1 - 1);
+  N[1] = L2 * (2 * L2 - 1);
+  N[2] = L3 * (2 * L3 - 1);
+  N[3] = 4 * L1 * L2;
+  N[4] = 4 * L2 * L3;
+  N[5] = 4 * L3 * L1;
+}
+
+Eigen::Matrix<double, 12, 1>
+element_thermal_force(double E, double nu, double alpha, double T0,
+                      const Nodes &nodes, const Element &e,
+                      const Eigen::Matrix<double, 6, 1> &Te) {
+  Eigen::Matrix<double, 12, 1> Fe_th = Eigen::Matrix<double, 12, 1>::Zero();
+
+  const double xi[3] = {1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
+  const double eta[3] = {1.0 / 6.0, 1.0 / 6.0, 2.0 / 3.0};
+  const double w = 1.0 / 6.0;
+
+  Eigen::Matrix3d D;
+  D << 1, nu, 0, nu, 1, 0, 0, 0, (1 - nu) / 2;
+  D *= E / (1 - nu * nu);
+
+  for (int gp = 0; gp < 3; ++gp) {
+
+    Eigen::Matrix<double, 3, 12> B;
+    double detJ;
+
+    compute_B(nodes, e, xi[gp], eta[gp], B, detJ);
+    double N[6];
+    shape_functions(xi[gp], eta[gp], N);
+
+    double Tgp = 0.0;
+    for (int i = 0; i < 6; ++i)
+      Tgp += N[i] * Te(i); // interpolate temperature
+
+    Eigen::Vector3d eps_th;
+    eps_th << 1, 1, 0;
+    eps_th *= alpha * (Tgp - T0);
+
+    Fe_th += B.transpose() * D * eps_th * detJ * w;
+  }
+
+  return Fe_th;
 }

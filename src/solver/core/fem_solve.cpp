@@ -4,52 +4,338 @@
 #include <Eigen/Dense>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <unordered_set>
 
-SolverOutput fem_solve(const SolverInput &input) {
+auto mdof = [](int node, int comp) { return node * 2 + comp; };
 
-  constexpr double E = 210e6;
-  constexpr double nu = 0.3;
-  constexpr double t = 1.0;
+// ───────────────────────────────────────────────────────────────
+//  Helper: validate that a matrix/vector has no NaN or Inf
+// ───────────────────────────────────────────────────────────────
+template <typename Derived>
+static void check_finite(const Eigen::MatrixBase<Derived> &M,
+                         const std::string &label) {
+  if (!M.allFinite()) {
+    std::ostringstream oss;
+    oss << "ERROR: " << label << " contains NaN or Inf!\n" << M << "\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
+// ───────────────────────────────────────────────────────────────
+//  Helper: validate SolverInput before any solve
+// ───────────────────────────────────────────────────────────────
+static void validate_input(const SolverInput &input) {
+  if (input.nodes.empty())
+    throw std::runtime_error("ERROR: No nodes in input.");
+
+  if (input.elements.empty())
+    throw std::runtime_error("ERROR: No elements in input.");
+
+  const int nnodes = static_cast<int>(input.nodes.size());
+
+  // Check element connectivity bounds
+  for (size_t ei = 0; ei < input.elements.size(); ++ei) {
+    const auto &e = input.elements[ei];
+    for (int i = 0; i < 6; ++i) {
+      if (e[i] < 0 || e[i] >= nnodes) {
+        std::ostringstream oss;
+        oss << "ERROR: Element " << ei << " local node " << i
+            << " has global index " << e[i] << " which is out of range [0, "
+            << nnodes - 1 << "].";
+        throw std::runtime_error(oss.str());
+      }
+    }
+  }
+
+  // Check boundary edge node bounds
+  for (size_t bi = 0; bi < input.boundary_edges.size(); ++bi) {
+    const auto &edge = input.boundary_edges[bi];
+    for (int nid : {edge.n1, edge.n2, edge.n3}) {
+      if (nid < 0 || nid >= nnodes) {
+        std::ostringstream oss;
+        oss << "ERROR: Boundary edge " << bi << " references node " << nid
+            << " which is out of range [0, " << nnodes - 1 << "].";
+        throw std::runtime_error(oss.str());
+      }
+    }
+    if (edge.h < 0.0) {
+      std::ostringstream oss;
+      oss << "ERROR: Boundary edge " << bi
+          << " has negative convection coefficient h = " << edge.h;
+      throw std::runtime_error(oss.str());
+    }
+  }
+
+  // Check fixed DOF bounds
+  const size_t mech_ndof = input.nodes.size() * 2;
+  if (input.fixed_dofs.size() != input.fixed_values.size()) {
+    throw std::runtime_error(
+        "ERROR: fixed_dofs and fixed_values have different sizes.");
+  }
+  for (size_t i = 0; i < input.fixed_dofs.size(); ++i) {
+    if (input.fixed_dofs[i] >= mech_ndof) {
+      std::ostringstream oss;
+      oss << "ERROR: fixed_dofs[" << i << "] = " << input.fixed_dofs[i]
+          << " is out of range [0, " << mech_ndof - 1 << "].";
+      throw std::runtime_error(oss.str());
+    }
+  }
+
+  // Check force vector size
+  if (input.forces.size() != mech_ndof) {
+    std::ostringstream oss;
+    oss << "ERROR: Force vector size (" << input.forces.size()
+        << ") != 2 * number of nodes (" << mech_ndof << ").";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Check node coordinates are finite
+  for (size_t i = 0; i < input.nodes.size(); ++i) {
+    if (!std::isfinite(input.nodes[i].x) || !std::isfinite(input.nodes[i].y)) {
+      std::ostringstream oss;
+      oss << "ERROR: Node " << i << " has non-finite coordinates ("
+          << input.nodes[i].x << ", " << input.nodes[i].y << ").";
+      throw std::runtime_error(oss.str());
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  THERMAL SOLVER
+// ═══════════════════════════════════════════════════════════════
+Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
+
+  if (k <= 0.0)
+    throw std::runtime_error("ERROR: Thermal conductivity k must be > 0.");
+
+  if (input.boundary_edges.empty())
+    std::cerr << "WARNING: No boundary edges — thermal system may be "
+                 "singular (no BCs).\n";
+
+  size_t ndof = input.nodes.size();
+  Eigen::SparseMatrix<double> Ktt(ndof, ndof);
+  std::vector<Eigen::Triplet<double>> triplets;
+  triplets.reserve(input.elements.size() * 36 +
+                   input.boundary_edges.size() * 9);
+  Eigen::VectorXd Qt = Eigen::VectorXd::Zero(ndof);
+
+  const double s_gp[2] = {-1.0 / std::sqrt(3.0), 1.0 / std::sqrt(3.0)};
+  const double w_gp[2] = {1.0, 1.0};
+
+  // ── Convection boundary edges ──
+  for (size_t bi = 0; bi < input.boundary_edges.size(); ++bi) {
+    const auto &edge = input.boundary_edges[bi];
+    int nodes[3] = {edge.n1, edge.n2, edge.n3};
+
+    Eigen::Matrix3d Ke = Eigen::Matrix3d::Zero();
+    Eigen::Vector3d Fe = Eigen::Vector3d::Zero();
+
+    const Node &x1 = input.nodes[nodes[0]];
+    const Node &x2 = input.nodes[nodes[2]];
+
+    double dx = x2.x - x1.x;
+    double dy = x2.y - x1.y;
+    double L = std::sqrt(dx * dx + dy * dy);
+
+    if (L < 1e-15) {
+      std::ostringstream oss;
+      oss << "ERROR: Boundary edge " << bi << " has zero length (nodes "
+          << nodes[0] << " and " << nodes[2] << " coincide).";
+      throw std::runtime_error(oss.str());
+    }
+
+    double detJ = L / 2.0;
+
+    for (int gp = 0; gp < 2; ++gp) {
+      double s = s_gp[gp];
+      double w = w_gp[gp];
+
+      double N[3];
+      N[0] = 0.5 * s * (s - 1.0);
+      N[1] = 1.0 - s * s;
+      N[2] = 0.5 * s * (s + 1.0);
+
+      for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          Ke(i, j) += edge.h * N[i] * N[j] * detJ * w;
+        }
+        Fe(i) += edge.h * edge.Tinf * N[i] * detJ * w;
+      }
+    }
+
+    check_finite(Ke, "Boundary edge " + std::to_string(bi) + " Ke");
+    check_finite(Fe, "Boundary edge " + std::to_string(bi) + " Fe");
+
+    for (int i = 0; i < 3; ++i) {
+      int gi = nodes[i];
+      for (int j = 0; j < 3; ++j) {
+        int gj = nodes[j];
+        triplets.emplace_back(gi, gj, Ke(i, j));
+      }
+      Qt(gi) += Fe(i);
+    }
+  }
+
+  // ── Conduction element stiffness ──
+  for (size_t ei = 0; ei < input.elements.size(); ++ei) {
+    const auto &e = input.elements[ei];
+    auto Ke = element_stiffness_heat(k, 1.0, input.nodes, e);
+
+    if (!Ke.allFinite()) {
+      std::ostringstream oss;
+      oss << "ERROR: Thermal element " << ei << " stiffness contains NaN/Inf.\n"
+          << "  Nodes: ";
+      for (int i = 0; i < 6; ++i)
+        oss << e[i] << "(" << input.nodes[e[i]].x << "," << input.nodes[e[i]].y
+            << ") ";
+      oss << "\n  Check for degenerate/inverted element geometry.";
+      throw std::runtime_error(oss.str());
+    }
+
+    for (int i = 0; i < 6; ++i)
+      for (int j = 0; j < 6; ++j)
+        triplets.emplace_back(e[i], e[j], Ke(i, j));
+  }
+
+  // ── Assemble and solve ──
+  Ktt.setFromTriplets(triplets.begin(), triplets.end());
+
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+  solver.compute(Ktt);
+
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error(
+        "ERROR: LDLT factorization failed for thermal system. "
+        "Matrix may be singular or not positive definite.");
+  }
+
+  // Check pivots
+  Eigen::VectorXd D = solver.vectorD();
+  for (int i = 0; i < D.size(); ++i) {
+    if (!std::isfinite(D(i))) {
+      std::ostringstream oss;
+      oss << "ERROR: Thermal LDLT pivot D(" << i << ") = " << D(i)
+          << " is not finite.";
+      throw std::runtime_error(oss.str());
+    }
+    if (D(i) <= 0.0) {
+      std::ostringstream oss;
+      oss << "ERROR: Thermal LDLT pivot D(" << i << ") = " << D(i)
+          << " is non-positive. Matrix is not SPD.\n"
+          << "  Likely cause: inverted element or missing boundary conditions.";
+      throw std::runtime_error(oss.str());
+    }
+  }
+
+  Eigen::VectorXd T = solver.solve(Qt);
+
+  if (solver.info() != Eigen::Success)
+    throw std::runtime_error("ERROR: Thermal back-substitution failed.");
+
+  if (!T.allFinite())
+    throw std::runtime_error(
+        "ERROR: Temperature solution contains NaN or Inf.");
+
+  return T;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DISPLACEMENT SOLVER
+// ═══════════════════════════════════════════════════════════════
+Eigen::VectorXd solve_displacement(const SolverInput &input,
+                                   const Eigen::VectorXd &T, double E,
+                                   double nu, double t, double alpha,
+                                   double T0) {
+
+  if (E <= 0.0)
+    throw std::runtime_error("ERROR: Young's modulus E must be > 0.");
+  if (nu <= -1.0 || nu >= 0.5)
+    throw std::runtime_error("ERROR: Poisson's ratio nu must be in (-1, 0.5).");
+  if (t <= 0.0)
+    throw std::runtime_error("ERROR: Thickness t must be > 0.");
+
+  if (T.size() != static_cast<int>(input.nodes.size())) {
+    std::ostringstream oss;
+    oss << "ERROR: Temperature vector size (" << T.size()
+        << ") != number of nodes (" << input.nodes.size() << ").";
+    throw std::runtime_error(oss.str());
+  }
 
   size_t ndof = input.nodes.size() * 2;
-
-  // Eigen::MatrixXd K = Eigen::MatrixXd::Zero(ndof, ndof);
   Eigen::SparseMatrix<double> K(ndof, ndof);
   std::vector<Eigen::Triplet<double>> triplets;
   triplets.reserve(input.elements.size() * 144);
 
-  for (const auto &e : input.elements) {
-    auto ke = element_stiffness_lst(E, nu, t, input.nodes, e);
-    for (size_t i = 0; i < 6; i++) {
-      for (size_t j = 0; j < 6; j++) {
-        int gi = e[i];
-        int gj = e[j];
-        int row = 2 * gi;
-        int col = 2 * gj;
-        triplets.emplace_back(row, col, ke(2 * i, 2 * j));
-        triplets.emplace_back(row, col + 1, ke(2 * i, 2 * j + 1));
-        triplets.emplace_back(row + 1, col, ke(2 * i + 1, 2 * j));
-        triplets.emplace_back(row + 1, col + 1, ke(2 * i + 1, 2 * j + 1));
-      }
-    }
-  }
-  K.setFromTriplets(triplets.begin(), triplets.end());
-
   Eigen::VectorXd F =
       Eigen::Map<const Eigen::VectorXd>(input.forces.data(), ndof);
 
+  // ── Mechanical stiffness ──
+  for (size_t ei = 0; ei < input.elements.size(); ++ei) {
+    const auto &e = input.elements[ei];
+    auto Ke = element_stiffness_lst(E, nu, t, input.nodes, e);
+
+    if (!Ke.allFinite()) {
+      std::ostringstream oss;
+      oss << "ERROR: Mechanical element " << ei
+          << " stiffness contains NaN/Inf.\n"
+          << "  Nodes: ";
+      for (int i = 0; i < 6; ++i)
+        oss << e[i] << "(" << input.nodes[e[i]].x << "," << input.nodes[e[i]].y
+            << ") ";
+      throw std::runtime_error(oss.str());
+    }
+
+    for (size_t i = 0; i < 6; i++) {
+      for (size_t j = 0; j < 6; j++) {
+        for (int a = 0; a < 2; a++) {
+          for (int b = 0; b < 2; b++) {
+            int row = mdof(e[i], a);
+            int col = mdof(e[j], b);
+            triplets.emplace_back(row, col, Ke(2 * i + a, 2 * j + b));
+          }
+        }
+      }
+    }
+  }
+
+  K.setFromTriplets(triplets.begin(), triplets.end());
+
   assert(K.rows() == K.cols());
-  assert(K.rows() == ndof);
+  assert(static_cast<size_t>(K.rows()) == ndof);
 
-  // if (!K.allFinite())
-  //   throw std::runtime_error("Stiffness matrix contains NaN/Inf");
+  // ── Thermal force ──
+  for (size_t ei = 0; ei < input.elements.size(); ++ei) {
+    const auto &e = input.elements[ei];
+    Eigen::Matrix<double, 6, 1> Te;
+    for (int i = 0; i < 6; ++i)
+      Te(i) = T(e[i]);
 
-  // if (!F.allFinite())
-  //   throw std::runtime_error("Load vector contains NaN/Inf");
+    auto Fe_th = element_thermal_force(E, nu, alpha, T0, input.nodes, e, Te);
 
-  // Apply Dirichlet BC
+    if (!Fe_th.allFinite()) {
+      std::ostringstream oss;
+      oss << "ERROR: Element " << ei << " thermal force contains NaN/Inf.";
+      throw std::runtime_error(oss.str());
+    }
+
+    for (int i = 0; i < 6; ++i) {
+      for (int a = 0; a < 2; ++a) {
+        int global_row = mdof(e[i], a);
+        int local_index = 2 * i + a;
+        F(global_row) += Fe_th(local_index);
+      }
+    }
+  }
+
+  // ── Dirichlet BCs ──
+  if (input.fixed_dofs.empty())
+    std::cerr << "WARNING: No Dirichlet BCs — mechanical system will be "
+                 "singular (rigid body modes).\n";
+
   for (size_t i = 0; i < input.fixed_dofs.size(); i++) {
     size_t d = input.fixed_dofs[i];
     F -= K.col(d) * input.fixed_values[i];
@@ -62,92 +348,166 @@ SolverOutput fem_solve(const SolverInput &input) {
   int counter_free = 0;
 
   for (size_t i = 0; i < ndof; i++) {
-    if (!fixed.count(i)) {
+    if (!fixed.count(i))
       map[i] = counter_free++;
-    }
   }
 
+  if (counter_free == 0)
+    throw std::runtime_error("ERROR: All DOFs are fixed — nothing to solve.");
+
+  // ── Extract free-free system ──
   std::vector<Eigen::Triplet<double>> triplets_ff;
 
   for (int k = 0; k < K.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(K, k); it; ++it) {
       int i = it.row();
       int j = it.col();
-
-      if (map[i] != -1 && map[j] != -1) {
+      if (map[i] != -1 && map[j] != -1)
         triplets_ff.emplace_back(map[i], map[j], it.value());
-      }
     }
   }
 
   Eigen::VectorXd F_ff(counter_free);
-
   for (size_t i = 0; i < ndof; i++) {
-    if (map[i] != -1) {
+    if (map[i] != -1)
       F_ff(map[i]) = F(i);
-    }
   }
+
+  check_finite(F_ff, "Reduced force vector F_ff");
 
   Eigen::SparseMatrix<double> K_ff(counter_free, counter_free);
   K_ff.setFromTriplets(triplets_ff.begin(), triplets_ff.end());
 
-  std::vector<size_t> free;
-  for (size_t i = 0; i < ndof; i++)
-    if (!fixed.count(i))
-      free.push_back(i);
-
-  Eigen::VectorXi free_idx(free.size());
-  for (size_t i = 0; i < free.size(); i++)
-    free_idx(i) = free[i];
-
-  // Eigen::VectorXd u_free = householder(K(free_idx, free_idx), F(free_idx));
-  // Eigen::VectorXd u_free = K(free_idx, free_idx).llt().solve(F(free_idx));
-  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+  // ── Solve ──
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
   solver.compute(K_ff);
-  Eigen::VectorXd u_free = solver.solve(F_ff);
 
-  Eigen::VectorXd u = Eigen::VectorXd::Zero(ndof);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error(
+        "ERROR: LDLT factorization failed for displacement system.");
+  }
 
-  for (size_t i = 0; i < ndof; i++) {
-    if (map[i] != -1) {
-      u(i) = u_free(map[i]);
+  // Check pivots
+  Eigen::VectorXd D = solver.vectorD();
+  for (int i = 0; i < D.size(); ++i) {
+    if (!std::isfinite(D(i))) {
+      std::ostringstream oss;
+      oss << "ERROR: Displacement LDLT pivot D(" << i << ") = " << D(i)
+          << " is not finite.";
+      throw std::runtime_error(oss.str());
+    }
+    if (D(i) <= 0.0) {
+      std::ostringstream oss;
+      oss << "ERROR: Displacement LDLT pivot D(" << i << ") = " << D(i)
+          << " is non-positive.\n"
+          << "  Likely cause: insufficient boundary conditions "
+             "(rigid body mode) or inverted element.";
+      throw std::runtime_error(oss.str());
     }
   }
 
+  Eigen::VectorXd u_free = solver.solve(F_ff);
+
+  if (solver.info() != Eigen::Success)
+    throw std::runtime_error("ERROR: Displacement back-substitution failed.");
+
+  if (!u_free.allFinite())
+    throw std::runtime_error(
+        "ERROR: Displacement solution contains NaN or Inf.");
+
+  // ── Scatter back to full vector ──
+  Eigen::VectorXd u = Eigen::VectorXd::Zero(ndof);
+  for (size_t i = 0; i < ndof; i++) {
+    if (map[i] != -1)
+      u(i) = u_free(map[i]);
+  }
   for (size_t i = 0; i < input.fixed_dofs.size(); i++) {
     u(input.fixed_dofs[i]) = input.fixed_values[i];
   }
 
-  SolverOutput out;
+  return u;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STRESS RECOVERY
+// ═══════════════════════════════════════════════════════════════
+std::vector<Eigen::Vector3d> solve_nodal_stress(const SolverInput &input,
+                                                const Eigen::VectorXd &u,
+                                                double E, double nu) {
+
+  if (u.size() != static_cast<int>(input.nodes.size() * 2)) {
+    std::ostringstream oss;
+    oss << "ERROR: Displacement vector size (" << u.size()
+        << ") != 2 * number of nodes (" << input.nodes.size() * 2 << ").";
+    throw std::runtime_error(oss.str());
+  }
 
   std::vector<Eigen::Vector3d> nodal_stress(input.nodes.size(),
                                             Eigen::Vector3d::Zero());
   std::vector<int> counter(input.nodes.size(), 0);
 
-  for (const auto &e : input.elements) {
+  for (size_t ei = 0; ei < input.elements.size(); ++ei) {
+    const auto &e = input.elements[ei];
 
     auto sg = compute_gauss_stress_lst(E, nu, input.nodes, e, u);
     auto sn = extrapolate_to_nodes(sg);
 
     for (int i = 0; i < 6; ++i) {
       int gid = e[i];
+
+      if (!std::isfinite(sn[i](0)) || !std::isfinite(sn[i](1)) ||
+          !std::isfinite(sn[i](2))) {
+        std::ostringstream oss;
+        oss << "ERROR: Element " << ei << " node " << i << " (global " << gid
+            << ") has non-finite stress: " << sn[i].transpose();
+        throw std::runtime_error(oss.str());
+      }
+
       nodal_stress[gid] += sn[i];
       counter[gid]++;
     }
   }
 
-  for (size_t i = 0; i < nodal_stress.size(); ++i)
+  for (size_t i = 0; i < nodal_stress.size(); ++i) {
     if (counter[i] > 0)
       nodal_stress[i] /= counter[i];
-
-  out.stress.reserve(nodal_stress.size());
-
-  for (const auto &s : nodal_stress) {
-    out.stress.push_back({s(0), s(1), s(2)});
+    else
+      std::cerr << "WARNING: Node " << i
+                << " is not referenced by any element (orphan node).\n";
   }
 
-  for (size_t i = 0; i < input.nodes.size(); i++)
+  return nodal_stress;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOP-LEVEL DRIVER
+// ═══════════════════════════════════════════════════════════════
+SolverOutput solve(const SolverInput &input) {
+
+  constexpr double E = 210e6;
+  constexpr double nu = 0.3;
+  constexpr double t = 1.0;
+  constexpr double k = 45.0;
+  constexpr double alpha = 12.0E-6;
+  constexpr double T0 = 23.0;
+
+  // ── Validate input first ──
+  validate_input(input);
+
+  Eigen::VectorXd T = solve_temperature(input, k);
+  Eigen::VectorXd u = solve_displacement(input, T, E, nu, t, alpha, T0);
+  std::vector<Eigen::Vector3d> nodal_stress =
+      solve_nodal_stress(input, u, E, nu);
+
+  SolverOutput out;
+  out.stress.reserve(nodal_stress.size());
+  for (const auto &s : nodal_stress)
+    out.stress.push_back({s(0), s(1), s(2)});
+
+  for (size_t i = 0; i < input.nodes.size(); i++) {
     out.disp.push_back({u(2 * i), u(2 * i + 1)});
+    out.temperature.push_back(T(i));
+  }
 
   return out;
 }

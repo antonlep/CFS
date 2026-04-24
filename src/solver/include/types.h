@@ -11,15 +11,23 @@ using Element = std::array<int, 6>;
 using Nodes = std::vector<Node>;
 using Elements = std::vector<Element>;
 
+struct BoundaryEdge {
+  int n1, n2, n3; // quadratic edge nodes
+  double h;
+  double Tinf;
+};
+
 struct SolverInput {
   std::vector<Node> nodes;
   std::vector<Element> elements;
   std::vector<size_t> fixed_dofs;
   std::vector<double> fixed_values;
   std::vector<double> forces;
+  std::vector<BoundaryEdge> boundary_edges;
 };
 
 struct SolverOutput {
   std::vector<std::array<double, 3>> stress;
   std::vector<std::array<double, 2>> disp;
+  std::vector<double> temperature;
 };
