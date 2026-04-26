@@ -1,6 +1,7 @@
 import sys
 from dataclasses import dataclass
 from mesh import create_mesh
+from solver import BoundaryEdge
 
 import pyvista as pv
 import pyvistaqt as pvqt
@@ -31,6 +32,8 @@ class GeometryParams:
 class LoadParams:
     force_x: int
     force_y: int
+    temp_left: int
+    temp_right: int
 
 
 class MainWindow(QMainWindow):
@@ -58,6 +61,12 @@ class MainWindow(QMainWindow):
 
         self.fx_box = self._spinbox(default=5000, step=5000, max_val=1000000)
         self.fy_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self.temp_left_box = self._spinbox(
+            default=300, step=1, min_val=280, max_val=320
+        )
+        self.temp_right_box = self._spinbox(
+            default=300, step=1, min_val=280, max_val=320
+        )
         self.size_box = self._spinbox(default=10, step=1, max_val=100)
         self.max_box = self._spinbox(
             default=100, step=10, max_val=10000, min_val=-10000
@@ -67,11 +76,13 @@ class MainWindow(QMainWindow):
         )
         controls_layout.addRow("Force X", self.fx_box)
         controls_layout.addRow("Force Y", self.fy_box)
+        controls_layout.addRow("Temperature left", self.temp_left_box)
+        controls_layout.addRow("Temperature right", self.temp_right_box)
         controls_layout.addRow("Mesh size", self.size_box)
 
         self.result_combo = QComboBox()
         self.result_combo.addItems(
-            ["stress x", "stress y", "shear xy", "disp x", "disp y"]
+            ["stress x", "stress y", "shear xy", "disp x", "disp y", "temperature"]
         )
         self.scale_box = self._spinbox(default=1000, step=500, max_val=10000)
         self.auto_box = QCheckBox()
@@ -104,6 +115,8 @@ class MainWindow(QMainWindow):
         self.width_box.valueChanged.connect(self.schedule_solve)
         self.fx_box.valueChanged.connect(self.schedule_solve)
         self.fy_box.valueChanged.connect(self.schedule_solve)
+        self.temp_left_box.valueChanged.connect(self.schedule_solve)
+        self.temp_right_box.valueChanged.connect(self.schedule_solve)
         self.size_box.valueChanged.connect(self.schedule_solve)
         self.result_combo.currentIndexChanged.connect(self.schedule_solve)
         self.scale_box.valueChanged.connect(self.schedule_solve)
@@ -130,6 +143,8 @@ class MainWindow(QMainWindow):
         return LoadParams(
             force_x=self.fx_box.value(),
             force_y=self.fy_box.value(),
+            temp_left=self.temp_left_box.value(),
+            temp_right=self.temp_right_box.value(),
         )
 
     def _read_options(self) -> LoadParams:
@@ -214,6 +229,15 @@ class MainWindow(QMainWindow):
         nn, nodes = self._get_nodes_by_name(model, "ALL_NODES")
         ee, elements = self._get_elements_by_name(model, "ALL_ELEMENTS")
         element_tags, node_tags, node_coords = self._get_edge_nodes(model, "SIDE_NODES")
+        left_element_tags, left_node_tags, left_node_coords = self._get_edge_nodes(
+            model, "X_FIXED"
+        )
+        print(element_tags)
+        print(node_tags)
+        print(node_coords)
+        print(left_element_tags)
+        print(left_node_tags)
+        print(left_node_coords)
         y_fixed, _ = self._get_nodes_by_name(model, "Y_FIXED")
         x_fixed, _ = self._get_nodes_by_name(model, "X_FIXED")
 
@@ -221,8 +245,14 @@ class MainWindow(QMainWindow):
         elements = [elements[i : i + 6] for i in range(0, len(elements), 6)]  # noqa
         elements = [[n - 1 for n in e] for e in elements]
 
-        fixed, displacements, forces = self._build_bc(
-            loads, node_tags, node_coords, x_fixed, y_fixed, len(nodes)
+        fixed, displacements, forces, convection_bcs = self._build_bc(
+            loads,
+            node_tags,
+            node_coords,
+            left_node_tags,
+            x_fixed,
+            y_fixed,
+            len(nodes),
         )
 
         print("nodes:")
@@ -232,11 +262,7 @@ class MainWindow(QMainWindow):
         print()
         try:
             results = solve_from_raw(
-                nodes,
-                elements,
-                fixed,
-                displacements,
-                forces,
+                nodes, elements, fixed, displacements, forces, convection_bcs
             )
         except Exception as e:
             self.result_label.setText(f"Solver error: {e}")
@@ -314,6 +340,7 @@ class MainWindow(QMainWindow):
         loads: LoadParams,
         node_tags,
         node_coords,
+        left_node_tags,
         x_fixed,
         y_fixed,
         n_nodes: int,
@@ -349,7 +376,28 @@ class MainWindow(QMainWindow):
                 else:
                     forces[(label - 1) * 2] += 4 * fx
                     forces[(label - 1) * 2 + 1] += 4 * fy
-        return fixed, displacements, forces
+        convection_bcs = []
+        for i in node_tags:
+            convection_bcs.append(
+                BoundaryEdge(
+                    n1=int(i[0] - 1),
+                    n2=int(i[1] - 1),
+                    n3=int(i[2] - 1),
+                    h=1000.0,
+                    Tinf=float(loads.temp_right),
+                )
+            )
+        for i in left_node_tags:
+            convection_bcs.append(
+                BoundaryEdge(
+                    n1=int(i[0] - 1),
+                    n2=int(i[1] - 1),
+                    n3=int(i[2] - 1),
+                    h=1000.0,
+                    Tinf=float(loads.temp_left),
+                )
+            )
+        return fixed, displacements, forces, convection_bcs
 
     def _build_grid(self, nodes, elements):
         cells = []
@@ -368,9 +416,11 @@ class MainWindow(QMainWindow):
             idx = {"stress x": 0, "stress y": 1, "shear xy": 2}[name]
             grid.point_data[name] = [s[idx] for s in results.stress]
 
-        else:  # displacement
+        elif name.startswith("disp"):  # displacement
             idx = {"disp x": 0, "disp y": 1}[name]
             grid.point_data[name] = [d[idx] for d in results.disp]
+        else:
+            grid.point_data[name] = results.temperature
 
     def schedule_solve(self):
         self.solve_timer.start()

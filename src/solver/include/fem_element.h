@@ -16,7 +16,8 @@ Eigen::Matrix<double, 12, 12> element_stiffness_lst(double E, double nu,
 
 std::array<Eigen::Vector3d, 3>
 compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
-                         const Element &e, const Eigen::VectorXd &u);
+                         const Element &e, const Eigen::VectorXd &u,
+                         double alpha, double T0, const Eigen::VectorXd *T);
 
 std::array<Eigen::Vector3d, 6>
 extrapolate_to_nodes(const std::array<Eigen::Vector3d, 3> &sg);

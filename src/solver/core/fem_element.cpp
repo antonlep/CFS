@@ -145,7 +145,9 @@ void compute_B_heat(const Nodes &nodes, const Element &e, double xi, double eta,
 
 std::array<Eigen::Vector3d, 3>
 compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
-                         const Element &e, const Eigen::VectorXd &u) {
+                         const Element &e, const Eigen::VectorXd &u,
+                         double alpha = 0.0, double T0 = 0.0,
+                         const Eigen::VectorXd *T = nullptr) {
 
   Eigen::Matrix<double, 12, 1> ue;
 
@@ -166,10 +168,32 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
   for (int gp = 0; gp < 3; ++gp) {
     Eigen::Matrix<double, 3, 12> B;
     double detJ;
-
     compute_B(nodes, e, xi[gp], eta[gp], B, detJ);
 
-    stresses[gp] = D * B * ue;
+    Eigen::Vector3d strain = B * ue;
+    if (T != nullptr) {
+      double x = xi[gp];
+      double h = eta[gp];
+      double L1 = 1.0 - x - h;
+      double L2 = x;
+      double L3 = h;
+      double N[6];
+      N[0] = L1 * (2.0 * L1 - 1.0);
+      N[1] = L2 * (2.0 * L2 - 1.0);
+      N[2] = L3 * (2.0 * L3 - 1.0);
+      N[3] = 4.0 * L1 * L2;
+      N[4] = 4.0 * L2 * L3;
+      N[5] = 4.0 * L3 * L1;
+      double T_gp = 0.0;
+      for (int i = 0; i < 6; ++i) {
+        T_gp += N[i] * (*T)(e[i]);
+      }
+      double dT = T_gp - T0;
+      Eigen::Vector3d eps_th;
+      eps_th << alpha * dT, alpha * dT, 0.0;
+      strain -= eps_th;
+    }
+    stresses[gp] = D * strain;
   }
 
   return stresses;

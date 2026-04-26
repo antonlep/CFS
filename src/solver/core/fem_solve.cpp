@@ -433,7 +433,9 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
 // ═══════════════════════════════════════════════════════════════
 std::vector<Eigen::Vector3d> solve_nodal_stress(const SolverInput &input,
                                                 const Eigen::VectorXd &u,
-                                                double E, double nu) {
+                                                const Eigen::VectorXd &T,
+                                                double E, double nu,
+                                                double alpha, double T0) {
 
   if (u.size() != static_cast<int>(input.nodes.size() * 2)) {
     std::ostringstream oss;
@@ -449,7 +451,8 @@ std::vector<Eigen::Vector3d> solve_nodal_stress(const SolverInput &input,
   for (size_t ei = 0; ei < input.elements.size(); ++ei) {
     const auto &e = input.elements[ei];
 
-    auto sg = compute_gauss_stress_lst(E, nu, input.nodes, e, u);
+    auto sg = compute_gauss_stress_lst(E, nu, input.nodes, e, u, alpha, T0, &T);
+
     auto sn = extrapolate_to_nodes(sg);
 
     for (int i = 0; i < 6; ++i) {
@@ -489,7 +492,7 @@ SolverOutput solve(const SolverInput &input) {
   constexpr double t = 1.0;
   constexpr double k = 45.0;
   constexpr double alpha = 12.0E-6;
-  constexpr double T0 = 23.0;
+  constexpr double T0 = 273.0;
 
   // ── Validate input first ──
   validate_input(input);
@@ -497,7 +500,7 @@ SolverOutput solve(const SolverInput &input) {
   Eigen::VectorXd T = solve_temperature(input, k);
   Eigen::VectorXd u = solve_displacement(input, T, E, nu, t, alpha, T0);
   std::vector<Eigen::Vector3d> nodal_stress =
-      solve_nodal_stress(input, u, E, nu);
+      solve_nodal_stress(input, u, T, E, nu, alpha, T0);
 
   SolverOutput out;
   out.stress.reserve(nodal_stress.size());
