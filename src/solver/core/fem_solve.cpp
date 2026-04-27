@@ -497,7 +497,12 @@ SolverOutput solve(const SolverInput &input) {
   // ── Validate input first ──
   validate_input(input);
 
-  Eigen::VectorXd T = solve_temperature(input, k);
+  Eigen::VectorXd T;
+  if (input.boundary_edges.empty()) {
+    T = Eigen::VectorXd::Constant(input.nodes.size(), T0);
+  } else {
+    T = solve_temperature(input, k);
+  }
   Eigen::VectorXd u = solve_displacement(input, T, E, nu, t, alpha, T0);
   std::vector<Eigen::Vector3d> nodal_stress =
       solve_nodal_stress(input, u, T, E, nu, alpha, T0);
