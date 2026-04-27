@@ -197,26 +197,39 @@ SolverInput read_file(const char *filename) {
         }
       }
     }
+    myfile.clear();
+    myfile.seekg(0);
+    read = false;
+    while (std::getline(myfile, str)) {
+      if (str.rfind("*SFILM", 0) == 0) {
+        read = true;
+        std::getline(myfile, str);
+      }
+      if (str.rfind("*", 0) == 0) {
+        read = false;
+      }
+      if (read == true) {
+        int n1, n2, n3;
+        double h;
+        double Tinf;
+        std::istringstream iss(str);
+        char sep = ',';
+        iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> h >> sep >> Tinf;
+        int idx1 = node_id_to_index[n1];
+        int idx2 = node_id_to_index[n2];
+        int idx3 = node_id_to_index[n3];
+        BoundaryEdge boundary1;
+        boundary1.n1 = idx1;
+        boundary1.n2 = idx2;
+        boundary1.n3 = idx3;
+        boundary1.h = h;
+        boundary1.Tinf = Tinf;
+        boundary_edges.push_back(boundary1);
+      }
+    }
     myfile.close();
     myfile2.close();
   }
-
-  BoundaryEdge boundary1;
-  boundary1.n1 = 0;
-  boundary1.n2 = 1;
-  boundary1.n3 = 2;
-  boundary1.h = 1000;
-  boundary1.Tinf = 300;
-
-  BoundaryEdge boundary2;
-  boundary2.n1 = 12;
-  boundary2.n2 = 13;
-  boundary2.n3 = 14;
-  boundary2.h = 1000;
-  boundary2.Tinf = 400;
-
-  boundary_edges.push_back(boundary1);
-  boundary_edges.push_back(boundary2);
 
   SolverInput input = {nodes, elems, u_indices, u, F, boundary_edges};
 
