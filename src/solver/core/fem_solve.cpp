@@ -498,7 +498,7 @@ SolverOutput solve(const SolverInput &input) {
   validate_input(input);
 
   Eigen::VectorXd T;
-  if (input.boundary_edges.empty()) {
+  if ((input.boundary_edges.empty()) || (input.boundary_edges.size() == 0)) {
     T = Eigen::VectorXd::Constant(input.nodes.size(), T0);
   } else {
     T = solve_temperature(input, k);

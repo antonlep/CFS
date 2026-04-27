@@ -29,7 +29,8 @@ def test_two_element():
     displacements = [0, 0, 0, 0]
     forces = [0.0] * (2 * len(nodes))
     forces[-6:] = [1666, 0, 6666, 0, 1666, 0]
-    result = solve_from_raw(nodes, elements, fixed, displacements, forces)
+    bes = []
+    result = solve_from_raw(nodes, elements, fixed, displacements, forces, bes)
 
     print(result.stress)
 
