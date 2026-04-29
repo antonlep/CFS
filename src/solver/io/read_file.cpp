@@ -47,7 +47,7 @@ SolverInput read_file(const char *filename) {
         double x, y, z;
         char sep = ',';
         iss >> node_id >> sep >> x >> sep >> y >> sep >> z;
-        int idx = nodes.size();
+        int idx = ssize(nodes);
         nodes.push_back(Node{x, y});
         node_id_to_index[node_id] = idx;
       }

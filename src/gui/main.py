@@ -1,25 +1,28 @@
+"""CFS GUI — main window and application entry point."""
+
 import sys
 from dataclasses import dataclass
-from mesh import create_mesh
-from solver import BoundaryEdge
 
-import pyvista as pv
 import pyvistaqt as pvqt
 from PySide6.QtCore import QSize, QTimer
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
     QLabel,
     QMainWindow,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QComboBox,
-    QFormLayout,
-    QCheckBox,
 )
 
+from boundary_conditions import LoadParams, build_boundary_conditions
+from mesh import create_mesh
+from mesh_extract import extract_mesh
 from solver_helpers import solve_from_raw
+from visualization import RESULT_TYPES, apply_results, build_grid, deform_grid
 
 
 @dataclass
@@ -29,101 +32,208 @@ class GeometryParams:
 
 
 @dataclass
-class LoadParams:
-    force_x: int
-    force_y: int
-    temp_left: int
-    temp_right: int
+class DisplayOptions:
+    scale: int
+    show_mesh: bool
+    mesh_size: int
+    scale_min: int
+    scale_max: int
+    auto_scale: bool
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.setWindowTitle("CFS GUI")
         self.setMinimumSize(QSize(600, 600))
+        self._build_ui()
 
-        self.build_ui()
+        self._solve_timer = QTimer(self)
+        self._solve_timer.setSingleShot(True)
+        self._solve_timer.setInterval(200)
+        self._solve_timer.timeout.connect(self._solve)
 
-        self.solve_timer = QTimer(self)
-        self.solve_timer.setSingleShot(True)
-        self.solve_timer.setInterval(200)
-        self.solve_timer.timeout.connect(self.solve)
+    # ── UI Construction ──
 
-    def build_ui(self):
-        root_layout = QVBoxLayout()
-        controls_layout = QFormLayout()
+    def _build_ui(self):
+        form = QFormLayout()
 
-        self.height_box = self._spinbox(default=10, step=2)
-        self.width_box = self._spinbox(default=20, step=2)
-        controls_layout.addRow("Height", self.height_box)
-        controls_layout.addRow("Width", self.width_box)
+        self._height_box = self._spinbox(default=10, step=2)
+        self._width_box = self._spinbox(default=20, step=2)
+        form.addRow("Height", self._height_box)
+        form.addRow("Width", self._width_box)
 
-        self.fx_box = self._spinbox(default=5000, step=5000, max_val=1000000)
-        self.fy_box = self._spinbox(default=5000, step=5000, max_val=1000000)
-        self.temp_left_box = self._spinbox(
+        self._fx_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self._fy_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self._temp_left_box = self._spinbox(
             default=300, step=1, min_val=280, max_val=320
         )
-        self.temp_right_box = self._spinbox(
+        self._temp_right_box = self._spinbox(
             default=300, step=1, min_val=280, max_val=320
         )
-        self.size_box = self._spinbox(default=10, step=1, max_val=100)
-        self.max_box = self._spinbox(
+        self._mesh_size_box = self._spinbox(default=10, step=1, max_val=100)
+        form.addRow("Force X", self._fx_box)
+        form.addRow("Force Y", self._fy_box)
+        form.addRow("Temperature left", self._temp_left_box)
+        form.addRow("Temperature right", self._temp_right_box)
+        form.addRow("Mesh size", self._mesh_size_box)
+
+        self._scale_box = self._spinbox(default=1000, step=500, max_val=10000)
+        self._max_box = self._spinbox(
             default=100, step=10, max_val=10000, min_val=-10000
         )
-        self.min_box = self._spinbox(
+        self._min_box = self._spinbox(
             default=-100, step=10, max_val=10000, min_val=-10000
         )
-        controls_layout.addRow("Force X", self.fx_box)
-        controls_layout.addRow("Force Y", self.fy_box)
-        controls_layout.addRow("Temperature left", self.temp_left_box)
-        controls_layout.addRow("Temperature right", self.temp_right_box)
-        controls_layout.addRow("Mesh size", self.size_box)
+        self._auto_scale_box = QCheckBox()
+        self._auto_scale_box.setChecked(True)
+        self._show_mesh_box = QCheckBox()
+        form.addRow("Scale factor", self._scale_box)
+        form.addRow("Scale max", self._max_box)
+        form.addRow("Scale min", self._min_box)
+        form.addRow("Auto scale", self._auto_scale_box)
+        form.addRow("Display mesh", self._show_mesh_box)
 
-        self.result_combo = QComboBox()
-        self.result_combo.addItems(
-            ["stress x", "stress y", "shear xy", "disp x", "disp y", "temperature"]
-        )
-        self.scale_box = self._spinbox(default=1000, step=500, max_val=10000)
-        self.auto_box = QCheckBox()
-        self.auto_box.setChecked(True)
-        self.mesh_box = QCheckBox()
-        controls_layout.addRow("Scale factor", self.scale_box)
-        controls_layout.addRow("Scale max", self.max_box)
-        controls_layout.addRow("Scale min", self.min_box)
-        controls_layout.addRow("Auto scale", self.auto_box)
-        controls_layout.addRow("Display mesh", self.mesh_box)
-        controls_layout.addRow("Plot", self.result_combo)
+        self._result_combo = QComboBox()
+        self._result_combo.addItems(RESULT_TYPES)
+        form.addRow("Plot", self._result_combo)
 
-        self.solve_button = QPushButton("Solve")
-        self.solve_button.clicked.connect(self.solve)
-        controls_layout.addRow(self.solve_button)
+        solve_btn = QPushButton("Solve")
+        solve_btn.clicked.connect(self._solve)
+        form.addRow(solve_btn)
 
-        self.result_label = QLabel("-")
-        controls_layout.addRow("Displacement", self.result_label)
+        self._result_label = QLabel("-")
+        form.addRow("Status", self._result_label)
 
-        self.plotter = pvqt.QtInteractor(self)
+        self._plotter = pvqt.QtInteractor(self)
 
-        root_layout.addLayout(controls_layout)
-        root_layout.addWidget(self.plotter.interactor)
+        root = QVBoxLayout()
+        root.addLayout(form)
+        root.addWidget(self._plotter.interactor)
 
         central = QWidget()
-        central.setLayout(root_layout)
+        central.setLayout(root)
         self.setCentralWidget(central)
 
-        self.height_box.valueChanged.connect(self.schedule_solve)
-        self.width_box.valueChanged.connect(self.schedule_solve)
-        self.fx_box.valueChanged.connect(self.schedule_solve)
-        self.fy_box.valueChanged.connect(self.schedule_solve)
-        self.temp_left_box.valueChanged.connect(self.schedule_solve)
-        self.temp_right_box.valueChanged.connect(self.schedule_solve)
-        self.size_box.valueChanged.connect(self.schedule_solve)
-        self.result_combo.currentIndexChanged.connect(self.schedule_solve)
-        self.scale_box.valueChanged.connect(self.schedule_solve)
-        self.mesh_box.stateChanged.connect(self.schedule_solve)
-        self.auto_box.stateChanged.connect(self.schedule_solve)
-        self.max_box.valueChanged.connect(self.schedule_solve)
-        self.min_box.valueChanged.connect(self.schedule_solve)
+        # Connect all controls to debounced solve
+        for widget in [
+            self._height_box,
+            self._width_box,
+            self._fx_box,
+            self._fy_box,
+            self._temp_left_box,
+            self._temp_right_box,
+            self._mesh_size_box,
+            self._scale_box,
+            self._max_box,
+            self._min_box,
+        ]:
+            widget.valueChanged.connect(self._schedule_solve)
+
+        self._result_combo.currentIndexChanged.connect(self._schedule_solve)
+        self._show_mesh_box.stateChanged.connect(self._schedule_solve)
+        self._auto_scale_box.stateChanged.connect(self._schedule_solve)
+
+    # ── Read UI State ──
+
+    def _read_geometry(self) -> GeometryParams:
+        return GeometryParams(
+            height=self._height_box.value(),
+            width=self._width_box.value(),
+        )
+
+    def _read_loads(self) -> LoadParams:
+        return LoadParams(
+            force_x=self._fx_box.value(),
+            force_y=self._fy_box.value(),
+            temp_left=self._temp_left_box.value(),
+            temp_right=self._temp_right_box.value(),
+        )
+
+    def _read_display(self) -> DisplayOptions:
+        return DisplayOptions(
+            scale=self._scale_box.value(),
+            show_mesh=self._show_mesh_box.isChecked(),
+            mesh_size=self._mesh_size_box.value(),
+            scale_min=self._min_box.value(),
+            scale_max=self._max_box.value(),
+            auto_scale=self._auto_scale_box.isChecked(),
+        )
+
+    # ── Solve + Plot ──
+
+    def _solve(self):
+        geom = self._read_geometry()
+        if geom.height <= 0 or geom.width <= 0:
+            return
+
+        loads = self._read_loads()
+        display = self._read_display()
+
+        # 1. Mesh
+        model = create_mesh(geom.width, geom.height, display.mesh_size)
+        mesh = extract_mesh(model)
+
+        # 2. Boundary conditions
+        bcs = build_boundary_conditions(
+            loads=loads,
+            n_nodes=len(mesh.nodes),
+            x_fixed_tags=mesh.x_fixed_nodes,
+            y_fixed_tags=mesh.y_fixed_nodes,
+            right_edges=mesh.right_edges,
+            left_edges=mesh.left_edges,
+        )
+
+        # 3. Solve
+        try:
+            results = solve_from_raw(
+                mesh.nodes,
+                mesh.elements,
+                bcs.fixed_dofs,
+                bcs.fixed_values,
+                bcs.forces,
+                bcs.convection_bcs,
+            )
+        except Exception as e:
+            self._result_label.setText(f"Solver error: {e}")
+            return
+
+        self._result_label.setText("OK")
+
+        # 4. Visualize
+        result_name = self._result_combo.currentText()
+        grid = build_grid(mesh.nodes, mesh.elements)
+        deform_grid(grid, mesh.nodes, results, display.scale)
+        apply_results(grid, results, result_name)
+
+        self._plot(grid, result_name, display)
+
+    def _plot(self, grid, result_name: str, display: DisplayOptions):
+        self._plotter.clear()
+        self._plotter.add_axes_at_origin()
+
+        clim = None if display.auto_scale else [display.scale_min, display.scale_max]
+        self._plotter.add_mesh(
+            grid,
+            show_edges=False,
+            scalars=result_name,
+            cmap="rainbow",
+            clim=clim,
+        )
+
+        if display.show_mesh:
+            edges = grid.extract_all_edges()
+        else:
+            edges = grid.extract_feature_edges(
+                boundary_edges=True,
+                feature_edges=False,
+                manifold_edges=False,
+                non_manifold_edges=False,
+            )
+        self._plotter.add_mesh(edges, color="black", line_width=2)
+
+    def _schedule_solve(self):
+        self._solve_timer.start()
 
     @staticmethod
     def _spinbox(default=0, step=1, min_val=0, max_val=100000):
@@ -132,303 +242,6 @@ class MainWindow(QMainWindow):
         box.setSingleStep(step)
         box.setValue(default)
         return box
-
-    def _read_geometry(self) -> GeometryParams:
-        return GeometryParams(
-            height=self.height_box.value(),
-            width=self.width_box.value(),
-        )
-
-    def _read_loads(self) -> LoadParams:
-        return LoadParams(
-            force_x=self.fx_box.value(),
-            force_y=self.fy_box.value(),
-            temp_left=self.temp_left_box.value(),
-            temp_right=self.temp_right_box.value(),
-        )
-
-    def _read_options(self) -> LoadParams:
-        return (
-            self.scale_box.value(),
-            self.mesh_box.isChecked(),
-            self.size_box.value(),
-            self.min_box.value(),
-            self.max_box.value(),
-            self.auto_box.isChecked(),
-        )
-
-    def _get_nodes_by_name(self, model, group_name):
-        # Get all physical groups: list of (dim, tag)
-        groups = model.getPhysicalGroups()
-
-        for dim, tag in groups:
-            # Check if this tag's name matches our target
-            if model.getPhysicalName(dim, tag) == group_name:
-                # Returns (nodeTags, coord, parametricCoord)
-                nodes = model.mesh.getNodesForPhysicalGroup(dim, tag)
-                return nodes
-
-    def _get_edge_nodes(self, model, group_name):
-        groups = model.getPhysicalGroups()
-        nodes = []
-        coords = []
-        for dim, tag in groups:
-            if model.getPhysicalName(dim, tag) == group_name:
-                entities = model.getEntitiesForPhysicalGroup(dim, tag)
-                types, elementTags, nodeTags = model.mesh.getElements(1, entities[0])
-                nodeTags = nodeTags[0]
-                nodeTags = [
-                    nodeTags[i : i + 3] for i in range(0, len(nodeTags), 3)  # noqa
-                ]
-                for n in nodeTags:
-                    node_coords = []
-                    node_nodes = []
-                    for i in n:
-                        c = model.mesh.getNode(i)
-                        node_coords.append(float(c[0][1]))
-                        node_nodes.append(int(i))
-                    coords.append(node_coords)
-                    nodes.append(node_nodes)
-        return elementTags, nodes, coords
-
-    def _get_elements_by_name(self, model, group_name):
-        groups = model.getPhysicalGroups()
-
-        for dim, tag in groups:
-            if model.getPhysicalName(dim, tag) == group_name:
-
-                entities = model.getEntitiesForPhysicalGroup(dim, tag)
-
-                element_tags = []
-                element_nodes = []
-
-                for entity in entities:
-                    types, tags, nodes = model.mesh.getElements(dim, entity)
-
-                    for t in tags:
-                        tt = [int(i) for i in t]
-                        element_tags.extend(tt)
-
-                    for n in nodes:
-                        nn = [int(i) for i in n]
-                        element_nodes.extend(nn)
-
-                return element_tags, element_nodes
-
-    def solve(self):
-        if self.height_box.value() <= 0 or self.width_box.value() <= 0:
-            return
-        geom = self._read_geometry()
-        loads = self._read_loads()
-        scale, show_mesh, mesh_size, scale_min, scale_max, auto_scale = (
-            self._read_options()
-        )
-
-        nodes, elements = self._build_mesh(geom)
-        model = create_mesh(geom.width, geom.height, mesh_size)
-        nn, nodes = self._get_nodes_by_name(model, "ALL_NODES")
-        ee, elements = self._get_elements_by_name(model, "ALL_ELEMENTS")
-        element_tags, node_tags, node_coords = self._get_edge_nodes(model, "SIDE_NODES")
-        left_element_tags, left_node_tags, left_node_coords = self._get_edge_nodes(
-            model, "X_FIXED"
-        )
-        print(element_tags)
-        print(node_tags)
-        print(node_coords)
-        print(left_element_tags)
-        print(left_node_tags)
-        print(left_node_coords)
-        y_fixed, _ = self._get_nodes_by_name(model, "Y_FIXED")
-        x_fixed, _ = self._get_nodes_by_name(model, "X_FIXED")
-
-        nodes = [[nodes[i], nodes[i + 1]] for i in range(0, len(nodes), 3)]
-        elements = [elements[i : i + 6] for i in range(0, len(elements), 6)]  # noqa
-        elements = [[n - 1 for n in e] for e in elements]
-
-        fixed, displacements, forces, convection_bcs = self._build_bc(
-            loads,
-            node_tags,
-            node_coords,
-            left_node_tags,
-            x_fixed,
-            y_fixed,
-            len(nodes),
-        )
-
-        print("nodes:")
-        print(len(nodes))
-        print("elements:")
-        print(len(elements))
-        print()
-        try:
-            results = solve_from_raw(
-                nodes, elements, fixed, displacements, forces, convection_bcs
-            )
-        except Exception as e:
-            self.result_label.setText(f"Solver error: {e}")
-            return
-
-        grid = self._build_grid(nodes, elements)
-        points = []
-        for (x, y), (ux, uy) in zip(nodes, results.disp):
-            points.append([x + scale * ux, y + scale * uy, 0.0])
-
-        grid.points = points
-        self._apply_results(grid, results)
-
-        self.plotter.clear()
-        self.plotter.add_axes_at_origin()
-        if auto_scale:
-            self.plotter.add_mesh(
-                grid,
-                show_edges=False,
-                scalars=self.result_combo.currentText(),
-                cmap="rainbow",
-            )
-        else:
-            self.plotter.add_mesh(
-                grid,
-                show_edges=False,
-                scalars=self.result_combo.currentText(),
-                cmap="rainbow",
-                clim=[scale_min, scale_max],
-            )
-
-        element_edges = grid.extract_all_edges()
-        outer_edges = grid.extract_feature_edges(
-            boundary_edges=True,
-            feature_edges=False,
-            manifold_edges=False,
-            non_manifold_edges=False,
-        )
-        if show_mesh:
-            self.plotter.add_mesh(element_edges, color="black", line_width=2)
-        else:
-            self.plotter.add_mesh(outer_edges, color="black", line_width=2)
-
-    def _build_mesh(self, geom: GeometryParams):
-        h, w = geom.height, geom.width
-
-        nodes = [
-            [0, 0],
-            [0, h / 2],
-            [0, h],
-            [w / 4, 0],
-            [w / 4, h / 2],
-            [w / 4, h],
-            [2 * w / 4, 0],
-            [2 * w / 4, h / 2],
-            [2 * w / 4, h],
-            [3 * w / 4, 0],
-            [3 * w / 4, h / 2],
-            [3 * w / 4, h],
-            [4 * w / 4, 0],
-            [4 * w / 4, h / 2],
-            [4 * w / 4, h],
-        ]
-        elements = [
-            [0, 8, 2, 4, 5, 1],
-            [0, 6, 8, 3, 7, 4],
-            [6, 12, 14, 9, 13, 10],
-            [6, 14, 8, 10, 11, 7],
-        ]
-
-        return nodes, elements
-
-    def _build_bc(
-        self,
-        loads: LoadParams,
-        node_tags,
-        node_coords,
-        left_node_tags,
-        x_fixed,
-        y_fixed,
-        n_nodes: int,
-    ):
-        x_fixed_trans = [int((i - 1) * 2) for i in x_fixed]
-        y_fixed_trans = [int((i - 1) * 2 + 1) for i in y_fixed]
-        fixed = x_fixed_trans + y_fixed_trans
-        displacements = [0] * len(fixed)
-        min_y = 1e99
-        max_y = -1e99
-        for e in node_coords:
-            for n in e:
-                if n < min_y:
-                    min_y = n
-                if n > max_y:
-                    max_y = n
-        # height = max_y - min_y
-        forces = [0.0] * (2 * n_nodes)
-        for i in range(0, len(node_coords)):
-            local_coords = node_coords[i]
-            min_node = local_coords.index(min(local_coords))
-            max_node = local_coords.index(max(local_coords))
-            # dist = local_coords[max_node] - local_coords[min_node]
-            # fx = loads.force_x * dist / height / 6
-            # fy = loads.force_y * dist / height / 6
-            fx = loads.force_x / len(node_coords) / 6
-            fy = loads.force_y / len(node_coords) / 6
-            for c in [0, 1, 2]:
-                label = node_tags[i][c]
-                if c == min_node or c == max_node:
-                    forces[(label - 1) * 2] += fx
-                    forces[(label - 1) * 2 + 1] += fy
-                else:
-                    forces[(label - 1) * 2] += 4 * fx
-                    forces[(label - 1) * 2 + 1] += 4 * fy
-        convection_bcs = []
-        for i in node_tags:
-            convection_bcs.append(
-                BoundaryEdge(
-                    n1=int(i[0] - 1),
-                    n2=int(i[1] - 1),
-                    n3=int(i[2] - 1),
-                    h=1000.0,
-                    Tinf=float(loads.temp_right),
-                )
-            )
-        for i in left_node_tags:
-            convection_bcs.append(
-                BoundaryEdge(
-                    n1=int(i[0] - 1),
-                    n2=int(i[1] - 1),
-                    n3=int(i[2] - 1),
-                    h=1000.0,
-                    Tinf=float(loads.temp_left),
-                )
-            )
-        return fixed, displacements, forces, convection_bcs
-
-    def _build_grid(self, nodes, elements):
-        cells = []
-        for e in elements:
-            cells.extend([6, *e])
-
-        celltypes = [pv.CellType.QUADRATIC_TRIANGLE] * len(elements)
-        points = [[x, y, 0.0] for x, y in nodes]
-
-        return pv.UnstructuredGrid(cells, celltypes, points)
-
-    def _apply_results(self, grid, results):
-        name = self.result_combo.currentText()
-
-        if name.startswith("stress") or name.startswith("shear"):
-            idx = {"stress x": 0, "stress y": 1, "shear xy": 2}[name]
-            grid.point_data[name] = [s[idx] for s in results.stress]
-
-        elif name.startswith("disp"):  # displacement
-            idx = {"disp x": 0, "disp y": 1}[name]
-            grid.point_data[name] = [d[idx] for d in results.disp]
-        else:
-            grid.point_data[name] = results.temperature
-
-    def schedule_solve(self):
-        self.solve_timer.start()
-
-
-# ----------------------------
-# App entry point
-# ----------------------------
 
 
 def main():
