@@ -1,0 +1,5 @@
+add_test( [==[Single element tension]==] C:/Users/anton/CFSolve/build-release/src/solver/solver_tests.exe [==[Single element tension]==]  )
+set_tests_properties( [==[Single element tension]==] PROPERTIES WORKING_DIRECTORY C:/Users/anton/CFSolve/build-release/src/solver)
+add_test( [==[Single element compression]==] C:/Users/anton/CFSolve/build-release/src/solver/solver_tests.exe [==[Single element compression]==]  )
+set_tests_properties( [==[Single element compression]==] PROPERTIES WORKING_DIRECTORY C:/Users/anton/CFSolve/build-release/src/solver)
+set( solver_tests_TESTS [==[Single element tension]==] [==[Single element compression]==])

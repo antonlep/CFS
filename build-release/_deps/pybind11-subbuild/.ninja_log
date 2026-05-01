@@ -1,0 +1,21 @@
+# ninja log v7
+2	70	7993446748803876	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-mkdir	8f1b480e212417e5
+2	70	7993446748803876	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-mkdir	8f1b480e212417e5
+70	4948	7993446797545906	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-download	8fba939d3080d4a7
+70	4948	7993446797545906	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-download	8fba939d3080d4a7
+4948	5222	7993446797691420	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-update	81a7469279cd9fb
+4948	5222	7993446797691420	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-update	81a7469279cd9fb
+5223	5335	7993446801398058	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-patch	f37a37123bb61e2
+5223	5335	7993446801398058	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-patch	f37a37123bb61e2
+5335	5435	7993446802425357	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-configure	7d80692625ba2487
+5335	5435	7993446802425357	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-configure	7d80692625ba2487
+5436	5533	7993446803381084	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-build	9e3b2e20474c6394
+5436	5533	7993446803381084	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-build	9e3b2e20474c6394
+5533	5633	7993446804377955	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-install	56e46256f6b7ba2f
+5533	5633	7993446804377955	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-install	56e46256f6b7ba2f
+5633	5736	7993446805423650	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-test	bd313a0cc3e79449
+5633	5736	7993446805423650	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-test	bd313a0cc3e79449
+5736	5879	7993446806853452	CMakeFiles/pybind11-populate-complete	c661ff7e9b96dba4
+5736	5879	7993446806853452	pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-done	c661ff7e9b96dba4
+5736	5879	7993446806853452	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/CMakeFiles/pybind11-populate-complete	c661ff7e9b96dba4
+5736	5879	7993446806853452	C:/Users/anton/CFSolve/build-release/_deps/pybind11-subbuild/pybind11-populate-prefix/src/pybind11-populate-stamp/pybind11-populate-done	c661ff7e9b96dba4

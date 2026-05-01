@@ -1,7 +1,7 @@
 """Build solver boundary conditions from mesh data and load parameters."""
 
 from dataclasses import dataclass
-from solver import BoundaryEdge
+from solver import BoundaryEdge, TractionEdge
 
 
 @dataclass
@@ -18,6 +18,7 @@ class BoundaryConditions:
     fixed_values: list[float]
     forces: list[float]
     convection_bcs: list[BoundaryEdge]
+    traction_bcs: list[TractionEdge]
 
 
 def build_boundary_conditions(
@@ -41,19 +42,19 @@ def build_boundary_conditions(
     fixed_values = [0.0] * len(fixed_dofs)
 
     # --- Distributed forces on right edge ---
-    forces = [0.0] * (2 * n_nodes)
-    n_edges = len(right_edges)
-    if n_edges > 0:
-        fx_per_edge = loads.force_x / n_edges / 6
-        fy_per_edge = loads.force_y / n_edges / 6
+    # forces = [0.0] * (2 * n_nodes)
+    # n_edges = len(right_edges)
+    # if n_edges > 0:
+    #     fx_per_edge = loads.force_x / n_edges / 6
+    #     fy_per_edge = loads.force_y / n_edges / 6
 
-        for edge in right_edges:
-            # Simpson's rule weights: end=1, mid=4 (total=6)
-            weights = {0: 1.0, 1: 4.0, 2: 1.0}
-            for local_idx, global_node in enumerate(edge):
-                w = weights[local_idx]
-                forces[global_node * 2] += w * fx_per_edge
-                forces[global_node * 2 + 1] += w * fy_per_edge
+    #     for edge in right_edges:
+    #         # Simpson's rule weights: end=1, mid=4 (total=6)
+    #         weights = {0: 1.0, 1: 4.0, 2: 1.0}
+    #         for local_idx, global_node in enumerate(edge):
+    #             w = weights[local_idx]
+    #             forces[global_node * 2] += w * fx_per_edge
+    #             forces[global_node * 2 + 1] += w * fy_per_edge
 
     # --- Convection BCs ---
     convection_bcs = []
@@ -77,10 +78,20 @@ def build_boundary_conditions(
                 Tinf=loads.temp_left,
             )
         )
+    forces = [0.0] * (2 * n_nodes)
+    # --- Traction BCs ---
+    traction_bcs = []
+    for edge in right_edges:
+        traction_bcs.append(
+            TractionEdge(
+                n1=edge[0], n2=edge[1], n3=edge[2], tx=loads.force_x, ty=loads.force_y
+            )
+        )
 
     return BoundaryConditions(
         fixed_dofs=fixed_dofs,
         fixed_values=fixed_values,
         forces=forces,
         convection_bcs=convection_bcs,
+        traction_bcs=traction_bcs,
     )

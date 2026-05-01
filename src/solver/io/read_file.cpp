@@ -26,6 +26,7 @@ SolverInput read_file(const char *filename) {
   std::vector<double> u;
   std::vector<double> F;
   std::vector<BoundaryEdge> boundary_edges;
+  std::vector<TractionEdge> traction_edges;
   std::unordered_map<int, int> node_id_to_index;
 
   if ((myfile.is_open()) && (myfile2.is_open())) {
@@ -227,11 +228,42 @@ SolverInput read_file(const char *filename) {
         boundary_edges.push_back(boundary1);
       }
     }
+    myfile.clear();
+    myfile.seekg(0);
+    read = false;
+    while (std::getline(myfile, str)) {
+      if (str.rfind("*TRACTION", 0) == 0) {
+        read = true;
+        std::getline(myfile, str);
+      }
+      if (str.rfind("*", 0) == 0) {
+        read = false;
+      }
+      if (read == true) {
+        int n1, n2, n3;
+        double tx;
+        double ty;
+        std::istringstream iss(str);
+        char sep = ',';
+        iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> tx >> sep >> ty;
+        int idx1 = node_id_to_index[n1];
+        int idx2 = node_id_to_index[n2];
+        int idx3 = node_id_to_index[n3];
+        TractionEdge boundary1;
+        boundary1.n1 = idx1;
+        boundary1.n2 = idx2;
+        boundary1.n3 = idx3;
+        boundary1.tx = tx;
+        boundary1.ty = ty;
+        traction_edges.push_back(boundary1);
+      }
+    }
     myfile.close();
     myfile2.close();
   }
 
-  SolverInput input = {nodes, elems, u_indices, u, F, boundary_edges};
+  SolverInput input = {nodes, elems,          u_indices,     u,
+                       F,     boundary_edges, traction_edges};
 
   return input;
 }

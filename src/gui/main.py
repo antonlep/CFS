@@ -193,6 +193,7 @@ class MainWindow(QMainWindow):
                 bcs.fixed_values,
                 bcs.forces,
                 bcs.convection_bcs,
+                bcs.traction_bcs,
             )
         except Exception as e:
             self._result_label.setText(f"Solver error: {e}")

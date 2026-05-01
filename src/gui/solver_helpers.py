@@ -1,7 +1,9 @@
 import solver
 
 
-def solve_from_raw(nodes, elements, fixed, fixed_values, forces, convection_bcs):
+def solve_from_raw(
+    nodes, elements, fixed, fixed_values, forces, convection_bcs, traction_bcs
+):
     inp = solver.SolverInput()
     inp.nodes = [solver.Node(float(x), float(y)) for x, y in nodes]
     inp.elements = elements
@@ -9,4 +11,5 @@ def solve_from_raw(nodes, elements, fixed, fixed_values, forces, convection_bcs)
     inp.fixed_values = fixed_values
     inp.forces = forces
     inp.convection_bcs = convection_bcs
+    inp.traction_bcs = traction_bcs
     return solver.solve_from_data(inp)

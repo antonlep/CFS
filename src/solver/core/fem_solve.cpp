@@ -70,6 +70,19 @@ static void validate_input(const SolverInput &input) {
     }
   }
 
+  // Check boundary edge node bounds
+  for (size_t bi = 0; bi < input.traction_edges.size(); ++bi) {
+    const auto &edge = input.traction_edges[bi];
+    for (int nid : {edge.n1, edge.n2, edge.n3}) {
+      if (nid < 0 || nid >= nnodes) {
+        std::ostringstream oss;
+        oss << "ERROR: Boundary edge " << bi << " references node " << nid
+            << " which is out of range [0, " << nnodes - 1 << "].";
+        throw std::runtime_error(oss.str());
+      }
+    }
+  }
+
   // Check fixed DOF bounds
   const size_t mech_ndof = input.nodes.size() * 2;
   if (input.fixed_dofs.size() != input.fixed_values.size()) {
@@ -331,6 +344,52 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
     }
   }
 
+  const double s_gp[2] = {-1.0 / std::sqrt(3.0), 1.0 / std::sqrt(3.0)};
+  const double w_gp[2] = {1.0, 1.0};
+
+  // ── Convection boundary edges ──
+  for (size_t bi = 0; bi < input.traction_edges.size(); ++bi) {
+    const auto &edge = input.traction_edges[bi];
+    int nodes[3] = {edge.n1, edge.n2, edge.n3};
+
+    // Edge length (straight edge: n1 → n3)
+    const Node &x1 = input.nodes[nodes[0]];
+    const Node &x2 = input.nodes[nodes[2]];
+
+    double dx = x2.x - x1.x;
+    double dy = x2.y - x1.y;
+    double L = std::sqrt(dx * dx + dy * dy);
+
+    if (L < 1e-15) {
+      std::ostringstream oss;
+      oss << "ERROR: Traction edge " << bi << " has zero length (nodes "
+          << nodes[0] << " and " << nodes[2] << " coincide).";
+      throw std::runtime_error(oss.str());
+    }
+
+    double detJ = L / 2.0;
+
+    for (int gp = 0; gp < 2; ++gp) {
+      double s = s_gp[gp];
+      double w = w_gp[gp];
+
+      // 1D quadratic shape functions on [-1, +1]
+      // N1 at s=-1 (node n1), N3 at s=+1 (node n3), N2 at s=0 (mid-node n2)
+
+      double N[3];
+      N[0] = 0.5 * s * (s - 1.0);
+      N[1] = 1.0 - s * s;
+      N[2] = 0.5 * s * (s + 1.0);
+
+      for (int i = 0; i < 3; ++i) {
+        int dof_x = nodes[i] * 2;
+        int dof_y = nodes[i] * 2 + 1;
+        F(dof_x) += N[i] * edge.tx * detJ * w;
+        F(dof_y) += N[i] * edge.ty * detJ * w;
+      }
+    }
+  }
+
   // ── Dirichlet BCs ──
   if (input.fixed_dofs.empty())
     std::cerr << "WARNING: No Dirichlet BCs — mechanical system will be "
@@ -487,25 +546,21 @@ std::vector<Eigen::Vector3d> solve_nodal_stress(const SolverInput &input,
 // ═══════════════════════════════════════════════════════════════
 SolverOutput solve(const SolverInput &input) {
 
-  constexpr double E = 210e6;
-  constexpr double nu = 0.3;
-  constexpr double t = 1.0;
-  constexpr double k = 45.0;
-  constexpr double alpha = 12.0E-6;
-  constexpr double T0 = 273.0;
-
   // ── Validate input first ──
   validate_input(input);
 
+  const auto &mat = input.material;
+
   Eigen::VectorXd T;
   if ((input.boundary_edges.empty()) || (input.boundary_edges.size() == 0)) {
-    T = Eigen::VectorXd::Constant(input.nodes.size(), T0);
+    T = Eigen::VectorXd::Constant(input.nodes.size(), mat.T0);
   } else {
-    T = solve_temperature(input, k);
+    T = solve_temperature(input, mat.k);
   }
-  Eigen::VectorXd u = solve_displacement(input, T, E, nu, t, alpha, T0);
+  Eigen::VectorXd u =
+      solve_displacement(input, T, mat.E, mat.nu, mat.t, mat.alpha, mat.T0);
   std::vector<Eigen::Vector3d> nodal_stress =
-      solve_nodal_stress(input, u, T, E, nu, alpha, T0);
+      solve_nodal_stress(input, u, T, mat.E, mat.nu, mat.alpha, mat.T0);
 
   SolverOutput out;
   out.stress.reserve(nodal_stress.size());
