@@ -121,3 +121,8 @@
 64814	67440	7993447719556405	src/solver/solver_tests-b12d07c_tests.cmake	44cb21efdc9f6cb3
 64814	67440	7993447719556405	C:/Users/anton/CFSolve/build-release/src/solver/solver_tests-b12d07c_tests.cmake	44cb21efdc9f6cb3
 64786	71384	7993447693320536	src/solver/_solver.cp313-win_amd64.pyd	18e1b289c5819dea
+108	3917	7993643005245044	src/solver/CMakeFiles/solver_core.dir/api/solver_api.cpp.obj	c6b2cb2483eef112
+121	5521	7993643005385359	src/solver/CMakeFiles/solver_cli.dir/solver_cli.cpp.obj	a0923bfbe1327028
+115	20807	7993643005310255	src/solver/CMakeFiles/_solver.dir/bindings.cpp.obj	d2f37ffe3d46db91
+98	22851	7993643005148885	src/solver/CMakeFiles/solver_core.dir/core/fem_solve.cpp.obj	a29324722b4aebbf
+86	27294	7993643005058582	src/solver/CMakeFiles/solver_core.dir/core/fem_element.cpp.obj	76498b8287137e0f

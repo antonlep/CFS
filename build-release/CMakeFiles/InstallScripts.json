@@ -3,9 +3,7 @@
 	[
 		"C:/Users/anton/CFSolve/build-release/cmake_install.cmake",
 		"C:/Users/anton/CFSolve/build-release/src/solver/cmake_install.cmake",
-		"C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/cmake_install.cmake",
-		"C:/Users/anton/CFSolve/build-release/_deps/catch2-build/cmake_install.cmake",
-		"C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/cmake_install.cmake"
+		"C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

@@ -62,6 +62,11 @@ if (MSVC)
         /permissive-
         /wd4244       # Eigen::Index (64-bit) → int (32-bit), unavoidable & safe
     )
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MSVC)
+    target_compile_options(solver_core PRIVATE
+        -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion
+        -Werror
+    )
 else()
     target_compile_options(solver_core PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion

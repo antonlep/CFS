@@ -3,6 +3,8 @@ build_tools/config.sh
 solver/build
 build
 build-dev
+build-release
+build-ci
 .cache
 __pycache__
 Testing

@@ -42,6 +42,21 @@ PYBIND11_MODULE(_solver /*unused*/, m /*unused*/) {
       .def_readwrite("tx", &TractionEdge::tx)
       .def_readwrite("ty", &TractionEdge::ty);
 
+  py::class_<MaterialProperties>(m, "MaterialProperties")
+      .def(py::init<>())
+      .def(py::init([](double E, double nu, double t, double k, double alpha,
+                       double T0) {
+             return MaterialProperties{E, nu, t, k, alpha, T0};
+           }),
+           py::arg("E"), py::arg("nu"), py::arg("t"), py::arg("k"),
+           py::arg("alpha"), py::arg("T0"))
+      .def_readwrite("E", &MaterialProperties::E)
+      .def_readwrite("nu", &MaterialProperties::nu)
+      .def_readwrite("t", &MaterialProperties::t)
+      .def_readwrite("k", &MaterialProperties::k)
+      .def_readwrite("alpha", &MaterialProperties::alpha)
+      .def_readwrite("T0", &MaterialProperties::T0);
+
   py::class_<SolverInput>(m, "SolverInput")
       .def(py::init<>())
       .def_readwrite("nodes", &SolverInput::nodes)
@@ -50,7 +65,8 @@ PYBIND11_MODULE(_solver /*unused*/, m /*unused*/) {
       .def_readwrite("fixed_values", &SolverInput::fixed_values)
       .def_readwrite("forces", &SolverInput::forces)
       .def_readwrite("convection_bcs", &SolverInput::boundary_edges)
-      .def_readwrite("traction_bcs", &SolverInput::traction_edges);
+      .def_readwrite("traction_bcs", &SolverInput::traction_edges)
+      .def_readwrite("material", &SolverInput::material);
 
   py::class_<SolverOutput>(m, "SolverOutput")
       .def_readonly("stress", &SolverOutput::stress)

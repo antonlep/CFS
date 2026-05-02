@@ -35,7 +35,6 @@ C:/Users/anton/CFSolve/build-release/CMakeFiles/install/local.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/solver_core.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/_solver.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/solver_cli.dir
-C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/solver_tests.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/test.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/edit_cache.dir
 C:/Users/anton/CFSolve/build-release/src/solver/CMakeFiles/rebuild_cache.dir
@@ -48,17 +47,3 @@ C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/CMakeFiles/rebuild_cac
 C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/CMakeFiles/list_install_components.dir
 C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/CMakeFiles/install.dir
 C:/Users/anton/CFSolve/build-release/_deps/pybind11-build/CMakeFiles/install/local.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/test.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/edit_cache.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/rebuild_cache.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/list_install_components.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/install.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/CMakeFiles/install/local.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/Catch2.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/test.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/edit_cache.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/rebuild_cache.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/list_install_components.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/install.dir
-C:/Users/anton/CFSolve/build-release/_deps/catch2-build/src/CMakeFiles/install/local.dir
