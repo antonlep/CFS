@@ -1,5 +1,0 @@
-if(EXISTS "C:/Users/anton/CFSolve/build-release/src/solver/solver_tests-b12d07c_tests.cmake")
-  include("C:/Users/anton/CFSolve/build-release/src/solver/solver_tests-b12d07c_tests.cmake")
-else()
-  add_test(solver_tests_NOT_BUILT-b12d07c solver_tests_NOT_BUILT-b12d07c)
-endif()
