@@ -189,7 +189,7 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
       size_t gi = nodes[i];
       for (size_t j = 0; j < 3; ++j) {
         size_t gj = nodes[j];
-        triplets.emplace_back(gi, gj, Ke(eidx(i), eidx(j)));
+        triplets.emplace_back(sidx(gi), sidx(gj), Ke(eidx(i), eidx(j)));
       }
       Qt(eidx(gi)) += Fe(eidx(i));
     }
@@ -213,7 +213,7 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
 
     for (size_t i = 0; i < 6; ++i)
       for (size_t j = 0; j < 6; ++j)
-        triplets.emplace_back(e[i], e[j], Ke(eidx(i), eidx(j)));
+        triplets.emplace_back(sidx(e[i]), sidx(e[j]), Ke(eidx(i), eidx(j)));
   }
 
   // ── Assemble and solve ──
@@ -420,12 +420,13 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
   // ── Extract free-free system ──
   std::vector<Eigen::Triplet<double>> triplets_ff;
 
-  for (int k = 0; k < K.outerSize(); ++k) {
+  for (Eigen::Index k = 0; k < K.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(K, k); it; ++it) {
       auto i = static_cast<size_t>(it.row());
       auto j = static_cast<size_t>(it.col());
       if (map[i] != -1 && map[j] != -1)
-        triplets_ff.emplace_back(map[i], map[j], it.value());
+        triplets_ff.emplace_back(static_cast<int>(map[i]),
+                                 static_cast<int>(map[j]), it.value());
     }
   }
 
@@ -451,7 +452,7 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
 
   // Check pivots
   Eigen::VectorXd D = solver.vectorD();
-  for (int i = 0; i < D.size(); ++i) {
+  for (Eigen::Index i = 0; i < D.size(); ++i) {
     if (!std::isfinite(D(i))) {
       std::ostringstream oss;
       oss << "ERROR: Displacement LDLT pivot D(" << i << ") = " << D(i)

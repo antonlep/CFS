@@ -5,7 +5,7 @@
 # ── Setup (once) ──
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install --upgrade pip setuptools wheel
+python -m pip install --upgrade pip setuptools wheel
 pip install -e .
 cmake -S . -B build -G Ninja ^
     -DCMAKE_CXX_COMPILER=clang-cl ^

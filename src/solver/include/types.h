@@ -11,6 +11,7 @@ inline std::size_t uidx(int i) {
   assert(i >= 0);
   return static_cast<std::size_t>(i);
 }
+inline int sidx(std::size_t i) { return static_cast<int>(i); }
 
 struct Node {
   double x;

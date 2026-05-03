@@ -30,7 +30,10 @@ def test_two_element():
     forces = [0.0] * (2 * len(nodes))
     forces[-6:] = [1666, 0, 6666, 0, 1666, 0]
     bes = []
-    result = solve_from_raw(nodes, elements, fixed, displacements, forces, bes)
+    traction_bcs = []
+    result = solve_from_raw(
+        nodes, elements, fixed, displacements, forces, bes, traction_bcs
+    )
 
     print(result.stress)
 
