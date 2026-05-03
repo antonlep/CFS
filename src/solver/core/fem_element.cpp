@@ -56,8 +56,8 @@ Eigen::Vector3d element_stress(double E, double nu, const Nodes &nodes,
                                const Element &e, const Eigen::VectorXd &u) {
   Eigen::Matrix<double, 6, 1> ue;
   for (size_t i = 0; i < 3; i++) {
-    ue(2 * i) = u(2 * e[i]);
-    ue(2 * i + 1) = u(2 * e[i] + 1);
+    ue(eidx(2 * i)) = u(eidx(2 * e[i]));
+    ue(eidx(2 * i + 1)) = u(eidx(2 * e[i] + 1));
   }
 
   double A = area(nodes[e[0]], nodes[e[1]], nodes[e[2]]);
@@ -88,7 +88,7 @@ void compute_B(const Nodes &nodes, const Element &e, double xi, double eta,
 
   Eigen::Matrix2d J = Eigen::Matrix2d::Zero();
 
-  for (int i = 0; i < 6; ++i) {
+  for (size_t i = 0; i < 6; ++i) {
     const Node &n = nodes[e[i]];
     J(0, 0) += dN_dxi[i] * n.x;
     J(0, 1) += dN_dxi[i] * n.y;
@@ -101,17 +101,17 @@ void compute_B(const Nodes &nodes, const Element &e, double xi, double eta,
 
   B.setZero();
 
-  for (int i = 0; i < 6; ++i) {
+  for (size_t i = 0; i < 6; ++i) {
     Eigen::Vector2d dN_nat(dN_dxi[i], dN_deta[i]);
     Eigen::Vector2d dN = invJ * dN_nat;
 
     double dNx = dN(0);
     double dNy = dN(1);
 
-    B(0, 2 * i) = dNx;
-    B(1, 2 * i + 1) = dNy;
-    B(2, 2 * i) = dNy;
-    B(2, 2 * i + 1) = dNx;
+    B(0, eidx(2 * i)) = dNx;
+    B(1, eidx(2 * i + 1)) = dNy;
+    B(2, eidx(2 * i)) = dNy;
+    B(2, eidx(2 * i + 1)) = dNx;
   }
 }
 
@@ -123,7 +123,7 @@ void compute_B_heat(const Nodes &nodes, const Element &e, double xi, double eta,
 
   Eigen::Matrix2d J = Eigen::Matrix2d::Zero();
 
-  for (int i = 0; i < 6; ++i) {
+  for (size_t i = 0; i < 6; ++i) {
     const Node &n = nodes[e[i]];
     J(0, 0) += dN_dxi[i] * n.x;
     J(0, 1) += dN_dxi[i] * n.y;
@@ -134,12 +134,12 @@ void compute_B_heat(const Nodes &nodes, const Element &e, double xi, double eta,
   detJ = J.determinant();
   Eigen::Matrix2d invJ = J.inverse();
 
-  for (int i = 0; i < 6; ++i) {
+  for (size_t i = 0; i < 6; ++i) {
     Eigen::Vector2d dN_nat(dN_dxi[i], dN_deta[i]);
     Eigen::Vector2d dN = invJ * dN_nat;
 
-    B(0, i) = dN(0); // dN/dx
-    B(1, i) = dN(1); // dN/dy
+    B(0, eidx(i)) = dN(0); // dN/dx
+    B(1, eidx(i)) = dN(1); // dN/dy
   }
 }
 
@@ -151,9 +151,9 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
 
   Eigen::Matrix<double, 12, 1> ue;
 
-  for (int i = 0; i < 6; ++i) {
-    ue(2 * i) = u(2 * e[i]);
-    ue(2 * i + 1) = u(2 * e[i] + 1);
+  for (size_t i = 0; i < 6; ++i) {
+    ue(eidx(2 * i)) = u(eidx(2 * e[i]));
+    ue(eidx(2 * i + 1)) = u(eidx(2 * e[i] + 1));
   }
 
   Eigen::Matrix3d D;
@@ -165,7 +165,7 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
 
   std::array<Eigen::Vector3d, 3> stresses;
 
-  for (int gp = 0; gp < 3; ++gp) {
+  for (size_t gp = 0; gp < 3; ++gp) {
     Eigen::Matrix<double, 3, 12> B;
     double detJ;
     compute_B(nodes, e, xi[gp], eta[gp], B, detJ);
@@ -185,8 +185,8 @@ compute_gauss_stress_lst(double E, double nu, const Nodes &nodes,
       N[4] = 4.0 * L2 * L3;
       N[5] = 4.0 * L3 * L1;
       double T_gp = 0.0;
-      for (int i = 0; i < 6; ++i) {
-        T_gp += N[i] * (*T)(e[i]);
+      for (size_t i = 0; i < 6; ++i) {
+        T_gp += N[i] * (*T)(eidx(e[i]));
       }
       double dT = T_gp - T0;
       Eigen::Vector3d eps_th;
@@ -215,12 +215,12 @@ extrapolate_to_nodes(const std::array<Eigen::Vector3d, 3> &sg) {
   for (int comp = 0; comp < 3; ++comp) {
 
     Eigen::Vector3d s;
-    for (int i = 0; i < 3; ++i)
-      s(i) = sg[i](comp);
+    for (size_t i = 0; i < 3; ++i)
+      s(eidx(i)) = sg[i](comp);
 
     Eigen::Vector3d coeff = Ainv * s;
 
-    for (int i = 0; i < 6; ++i)
+    for (size_t i = 0; i < 6; ++i)
       sn[i](comp) = coeff(0) + coeff(1) * xi[i] + coeff(2) * eta[i];
   }
 
@@ -313,8 +313,8 @@ element_thermal_force(double E, double nu, double alpha, double T0,
     shape_functions(xi[gp], eta[gp], N);
 
     double Tgp = 0.0;
-    for (int i = 0; i < 6; ++i)
-      Tgp += N[i] * Te(i); // interpolate temperature
+    for (size_t i = 0; i < 6; ++i)
+      Tgp += N[i] * Te(eidx(i)); // interpolate temperature
 
     Eigen::Vector3d eps_th;
     eps_th << 1, 1, 0;

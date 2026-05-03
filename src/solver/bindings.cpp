@@ -12,7 +12,7 @@ PYBIND11_MODULE(_solver /*unused*/, m /*unused*/) {
 
   py::class_<BoundaryEdge>(m, "BoundaryEdge")
       .def(py::init<>())
-      .def(py::init([](int n1, int n2, int n3, double h, double Tinf) {
+      .def(py::init([](size_t n1, size_t n2, size_t n3, double h, double Tinf) {
              BoundaryEdge e;
              e.n1 = n1;
              e.n2 = n2;
@@ -31,7 +31,7 @@ PYBIND11_MODULE(_solver /*unused*/, m /*unused*/) {
 
   py::class_<TractionEdge>(m, "TractionEdge")
       .def(py::init<>())
-      .def(py::init([](int n1, int n2, int n3, double tx, double ty) {
+      .def(py::init([](size_t n1, size_t n2, size_t n3, double tx, double ty) {
              return TractionEdge{n1, n2, n3, tx, ty};
            }),
            py::arg("n1"), py::arg("n2"), py::arg("n3"), py::arg("tx"),

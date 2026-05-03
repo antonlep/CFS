@@ -55,19 +55,24 @@ target_compile_features(solver_core PUBLIC cxx_std_20)
 # -------------------------
 # Compiler warnings
 # -------------------------
-if (MSVC)
-    target_compile_options(solver_core PRIVATE
-        /W4
-        /WX
-        /permissive-
-        /wd4244       # Eigen::Index (64-bit) → int (32-bit), unavoidable & safe
-    )
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND MSVC)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(solver_core PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion
         -Werror
+        -Wno-c++98-compat
+        -Wno-c++98-compat-pedantic
+        -Wno-missing-prototypes
+        -Wno-newline-eof
+        -Wno-unsafe-buffer-usage
+        -Wno-pre-c++20-compat-pedantic
+        -Wno-shadow-field-in-constructor
+    )
+elseif (MSVC)
+    target_compile_options(solver_core PRIVATE
+        /W4 /WX /permissive- /wd4244
     )
 else()
+    # GCC (CI)
     target_compile_options(solver_core PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion
         -Werror

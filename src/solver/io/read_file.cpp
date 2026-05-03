@@ -29,7 +29,7 @@ SolverInput read_file(const char *filename) {
   std::vector<TractionEdge> traction_edges;
   struct MaterialProperties material;
 
-  std::unordered_map<int, int> node_id_to_index;
+  std::unordered_map<int, size_t> node_id_to_index;
 
   if ((myfile.is_open()) && (myfile2.is_open())) {
     std::string str;
@@ -50,7 +50,7 @@ SolverInput read_file(const char *filename) {
         double x, y, z;
         char sep = ',';
         iss >> node_id >> sep >> x >> sep >> y >> sep >> z;
-        int idx = ssize(nodes);
+        size_t idx = nodes.size();
         nodes.push_back(Node{x, y});
         node_id_to_index[node_id] = idx;
       }
@@ -72,9 +72,12 @@ SolverInput read_file(const char *filename) {
         char sep = ',';
         iss >> l >> sep >> n1 >> sep >> n2 >> sep >> n3 >> sep >> n4 >> sep >>
             n5 >> sep >> n6;
-        elems.push_back(Element{node_id_to_index[n1], node_id_to_index[n2],
-                                node_id_to_index[n3], node_id_to_index[n4],
-                                node_id_to_index[n5], node_id_to_index[n6]});
+        elems.push_back(Element{static_cast<size_t>(node_id_to_index[n1]),
+                                static_cast<size_t>(node_id_to_index[n2]),
+                                static_cast<size_t>(node_id_to_index[n3]),
+                                static_cast<size_t>(node_id_to_index[n4]),
+                                static_cast<size_t>(node_id_to_index[n5]),
+                                static_cast<size_t>(node_id_to_index[n6])});
       }
     }
     myfile.clear();
@@ -97,7 +100,7 @@ SolverInput read_file(const char *filename) {
           std::getline(iss, nodeset, sep);
           std::getline(iss, coord_str, sep);
           std::getline(iss, disp_str, sep);
-          int coord = std::stoi(coord_str);
+          size_t coord = static_cast<size_t>(std::stoi(coord_str));
           double disp = std::stod(disp_str);
           myfile2.clear();
           myfile2.seekg(0);
@@ -123,17 +126,18 @@ SolverInput read_file(const char *filename) {
             }
           }
           for (int node_id : nodeset_ids) {
-            int idx = node_id_to_index[node_id];
+            size_t idx = node_id_to_index[node_id];
             u_indices.push_back(idx * 2 + coord);
             u.push_back(disp);
           }
         } else {
-          int node, coord;
+          int node, coord_raw;
           double disp;
           std::istringstream iss(str);
           char sep = ',';
-          iss >> node >> sep >> coord >> sep >> disp;
-          int idx = node_id_to_index[node];
+          iss >> node >> sep >> coord_raw >> sep >> disp;
+          size_t idx = node_id_to_index[node];
+          size_t coord = static_cast<size_t>(coord_raw);
           u_indices.push_back(idx * 2 + coord);
           u.push_back(disp);
         }
@@ -160,7 +164,7 @@ SolverInput read_file(const char *filename) {
           std::getline(iss, nodeset, sep);
           std::getline(iss, coord_str, sep);
           std::getline(iss, force_str, sep);
-          int coord = std::stoi(coord_str);
+          size_t coord = static_cast<size_t>(std::stoi(coord_str));
           double force = std::stod(force_str);
           myfile2.clear();
           myfile2.seekg(0);
@@ -186,16 +190,17 @@ SolverInput read_file(const char *filename) {
             }
           }
           for (int node_id : nodeset_ids) {
-            int idx = node_id_to_index[node_id];
+            size_t idx = node_id_to_index[node_id];
             F[idx * 2 + coord] = force;
           }
         } else {
-          int node, coord;
+          int node, coord_raw;
           double force;
           std::istringstream iss(str);
           char sep = ',';
-          iss >> node >> sep >> coord >> sep >> force;
-          int idx = node_id_to_index[node];
+          iss >> node >> sep >> coord_raw >> sep >> force;
+          size_t idx = node_id_to_index[node];
+          size_t coord = static_cast<size_t>(coord_raw);
           F[idx * 2 + coord] = force;
         }
       }
@@ -218,9 +223,9 @@ SolverInput read_file(const char *filename) {
         std::istringstream iss(str);
         char sep = ',';
         iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> h >> sep >> Tinf;
-        int idx1 = node_id_to_index[n1];
-        int idx2 = node_id_to_index[n2];
-        int idx3 = node_id_to_index[n3];
+        size_t idx1 = node_id_to_index[n1];
+        size_t idx2 = node_id_to_index[n2];
+        size_t idx3 = node_id_to_index[n3];
         BoundaryEdge boundary1;
         boundary1.n1 = idx1;
         boundary1.n2 = idx2;
@@ -248,9 +253,9 @@ SolverInput read_file(const char *filename) {
         std::istringstream iss(str);
         char sep = ',';
         iss >> n1 >> sep >> n2 >> sep >> n3 >> sep >> tx >> sep >> ty;
-        int idx1 = node_id_to_index[n1];
-        int idx2 = node_id_to_index[n2];
-        int idx3 = node_id_to_index[n3];
+        size_t idx1 = node_id_to_index[n1];
+        size_t idx2 = node_id_to_index[n2];
+        size_t idx3 = node_id_to_index[n3];
         TractionEdge boundary1;
         boundary1.n1 = idx1;
         boundary1.n2 = idx2;

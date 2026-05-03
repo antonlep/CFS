@@ -10,7 +10,9 @@
 #include <stdexcept>
 #include <unordered_set>
 
-auto mdof = [](int node, int comp) { return node * 2 + comp; };
+auto mdof = [](size_t node, size_t comp) -> int {
+  return static_cast<int>(node * 2 + comp);
+};
 
 // ───────────────────────────────────────────────────────────────
 //  Helper: validate that a matrix/vector has no NaN or Inf
@@ -35,13 +37,13 @@ static void validate_input(const SolverInput &input) {
   if (input.elements.empty())
     throw std::runtime_error("ERROR: No elements in input.");
 
-  const int nnodes = static_cast<int>(input.nodes.size());
+  const size_t nnodes = input.nodes.size();
 
   // Check element connectivity bounds
   for (size_t ei = 0; ei < input.elements.size(); ++ei) {
     const auto &e = input.elements[ei];
-    for (int i = 0; i < 6; ++i) {
-      if (e[i] < 0 || e[i] >= nnodes) {
+    for (size_t i = 0; i < 6; ++i) {
+      if (e[i] >= nnodes) {
         std::ostringstream oss;
         oss << "ERROR: Element " << ei << " local node " << i
             << " has global index " << e[i] << " which is out of range [0, "
@@ -54,8 +56,8 @@ static void validate_input(const SolverInput &input) {
   // Check boundary edge node bounds
   for (size_t bi = 0; bi < input.boundary_edges.size(); ++bi) {
     const auto &edge = input.boundary_edges[bi];
-    for (int nid : {edge.n1, edge.n2, edge.n3}) {
-      if (nid < 0 || nid >= nnodes) {
+    for (size_t nid : {edge.n1, edge.n2, edge.n3}) {
+      if (nid >= nnodes) {
         std::ostringstream oss;
         oss << "ERROR: Boundary edge " << bi << " references node " << nid
             << " which is out of range [0, " << nnodes - 1 << "].";
@@ -73,8 +75,8 @@ static void validate_input(const SolverInput &input) {
   // Check boundary edge node bounds
   for (size_t bi = 0; bi < input.traction_edges.size(); ++bi) {
     const auto &edge = input.traction_edges[bi];
-    for (int nid : {edge.n1, edge.n2, edge.n3}) {
-      if (nid < 0 || nid >= nnodes) {
+    for (size_t nid : {edge.n1, edge.n2, edge.n3}) {
+      if (nid >= nnodes) {
         std::ostringstream oss;
         oss << "ERROR: Boundary edge " << bi << " references node " << nid
             << " which is out of range [0, " << nnodes - 1 << "].";
@@ -130,11 +132,11 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
                  "singular (no BCs).\n";
 
   size_t ndof = input.nodes.size();
-  Eigen::SparseMatrix<double> Ktt(ndof, ndof);
+  Eigen::SparseMatrix<double> Ktt(eidx(ndof), eidx(ndof));
   std::vector<Eigen::Triplet<double>> triplets;
   triplets.reserve(input.elements.size() * 36 +
                    input.boundary_edges.size() * 9);
-  Eigen::VectorXd Qt = Eigen::VectorXd::Zero(ndof);
+  Eigen::VectorXd Qt = Eigen::VectorXd::Zero(eidx(ndof));
 
   const double s_gp[2] = {-1.0 / std::sqrt(3.0), 1.0 / std::sqrt(3.0)};
   const double w_gp[2] = {1.0, 1.0};
@@ -142,7 +144,7 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
   // ── Convection boundary edges ──
   for (size_t bi = 0; bi < input.boundary_edges.size(); ++bi) {
     const auto &edge = input.boundary_edges[bi];
-    int nodes[3] = {edge.n1, edge.n2, edge.n3};
+    size_t nodes[3] = {edge.n1, edge.n2, edge.n3};
 
     Eigen::Matrix3d Ke = Eigen::Matrix3d::Zero();
     Eigen::Vector3d Fe = Eigen::Vector3d::Zero();
@@ -172,24 +174,24 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
       N[1] = 1.0 - s * s;
       N[2] = 0.5 * s * (s + 1.0);
 
-      for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-          Ke(i, j) += edge.h * N[i] * N[j] * detJ * w;
+      for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+          Ke(eidx(i), eidx(j)) += edge.h * N[i] * N[j] * detJ * w;
         }
-        Fe(i) += edge.h * edge.Tinf * N[i] * detJ * w;
+        Fe(eidx(i)) += edge.h * edge.Tinf * N[i] * detJ * w;
       }
     }
 
     check_finite(Ke, "Boundary edge " + std::to_string(bi) + " Ke");
     check_finite(Fe, "Boundary edge " + std::to_string(bi) + " Fe");
 
-    for (int i = 0; i < 3; ++i) {
-      int gi = nodes[i];
-      for (int j = 0; j < 3; ++j) {
-        int gj = nodes[j];
-        triplets.emplace_back(gi, gj, Ke(i, j));
+    for (size_t i = 0; i < 3; ++i) {
+      size_t gi = nodes[i];
+      for (size_t j = 0; j < 3; ++j) {
+        size_t gj = nodes[j];
+        triplets.emplace_back(gi, gj, Ke(eidx(i), eidx(j)));
       }
-      Qt(gi) += Fe(i);
+      Qt(eidx(gi)) += Fe(eidx(i));
     }
   }
 
@@ -202,16 +204,16 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
       std::ostringstream oss;
       oss << "ERROR: Thermal element " << ei << " stiffness contains NaN/Inf.\n"
           << "  Nodes: ";
-      for (int i = 0; i < 6; ++i)
+      for (size_t i = 0; i < 6; ++i)
         oss << e[i] << "(" << input.nodes[e[i]].x << "," << input.nodes[e[i]].y
             << ") ";
       oss << "\n  Check for degenerate/inverted element geometry.";
       throw std::runtime_error(oss.str());
     }
 
-    for (int i = 0; i < 6; ++i)
-      for (int j = 0; j < 6; ++j)
-        triplets.emplace_back(e[i], e[j], Ke(i, j));
+    for (size_t i = 0; i < 6; ++i)
+      for (size_t j = 0; j < 6; ++j)
+        triplets.emplace_back(e[i], e[j], Ke(eidx(i), eidx(j)));
   }
 
   // ── Assemble and solve ──
@@ -228,7 +230,7 @@ Eigen::VectorXd solve_temperature(const SolverInput &input, double k) {
 
   // Check pivots
   Eigen::VectorXd D = solver.vectorD();
-  for (int i = 0; i < D.size(); ++i) {
+  for (Eigen::Index i = 0; i < D.size(); ++i) {
     if (!std::isfinite(D(i))) {
       std::ostringstream oss;
       oss << "ERROR: Thermal LDLT pivot D(" << i << ") = " << D(i)
@@ -279,12 +281,12 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
   }
 
   size_t ndof = input.nodes.size() * 2;
-  Eigen::SparseMatrix<double> K(ndof, ndof);
+  Eigen::SparseMatrix<double> K(eidx(ndof), eidx(ndof));
   std::vector<Eigen::Triplet<double>> triplets;
   triplets.reserve(input.elements.size() * 144);
 
   Eigen::VectorXd F =
-      Eigen::Map<const Eigen::VectorXd>(input.forces.data(), ndof);
+      Eigen::Map<const Eigen::VectorXd>(input.forces.data(), eidx(ndof));
 
   // ── Mechanical stiffness ──
   for (size_t ei = 0; ei < input.elements.size(); ++ei) {
@@ -296,7 +298,7 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
       oss << "ERROR: Mechanical element " << ei
           << " stiffness contains NaN/Inf.\n"
           << "  Nodes: ";
-      for (int i = 0; i < 6; ++i)
+      for (size_t i = 0; i < 6; ++i)
         oss << e[i] << "(" << input.nodes[e[i]].x << "," << input.nodes[e[i]].y
             << ") ";
       throw std::runtime_error(oss.str());
@@ -304,11 +306,12 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
 
     for (size_t i = 0; i < 6; i++) {
       for (size_t j = 0; j < 6; j++) {
-        for (int a = 0; a < 2; a++) {
-          for (int b = 0; b < 2; b++) {
+        for (size_t a = 0; a < 2; a++) {
+          for (size_t b = 0; b < 2; b++) {
             int row = mdof(e[i], a);
             int col = mdof(e[j], b);
-            triplets.emplace_back(row, col, Ke(2 * i + a, 2 * j + b));
+            triplets.emplace_back(row, col,
+                                  Ke(eidx(2 * i + a), eidx(2 * j + b)));
           }
         }
       }
@@ -324,8 +327,8 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
   for (size_t ei = 0; ei < input.elements.size(); ++ei) {
     const auto &e = input.elements[ei];
     Eigen::Matrix<double, 6, 1> Te;
-    for (int i = 0; i < 6; ++i)
-      Te(i) = T(e[i]);
+    for (size_t i = 0; i < 6; ++i)
+      Te(eidx(i)) = T(eidx(e[i]));
 
     auto Fe_th = element_thermal_force(E, nu, alpha, T0, input.nodes, e, Te);
 
@@ -335,10 +338,10 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
       throw std::runtime_error(oss.str());
     }
 
-    for (int i = 0; i < 6; ++i) {
-      for (int a = 0; a < 2; ++a) {
+    for (size_t i = 0; i < 6; ++i) {
+      for (size_t a = 0; a < 2; ++a) {
         int global_row = mdof(e[i], a);
-        int local_index = 2 * i + a;
+        Eigen::Index local_index = eidx(2 * i + a);
         F(global_row) += Fe_th(local_index);
       }
     }
@@ -350,7 +353,7 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
   // ── Convection boundary edges ──
   for (size_t bi = 0; bi < input.traction_edges.size(); ++bi) {
     const auto &edge = input.traction_edges[bi];
-    int nodes[3] = {edge.n1, edge.n2, edge.n3};
+    size_t nodes[3] = {edge.n1, edge.n2, edge.n3};
 
     // Edge length (straight edge: n1 → n3)
     const Node &x1 = input.nodes[nodes[0]];
@@ -381,9 +384,9 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
       N[1] = 1.0 - s * s;
       N[2] = 0.5 * s * (s + 1.0);
 
-      for (int i = 0; i < 3; ++i) {
-        int dof_x = nodes[i] * 2;
-        int dof_y = nodes[i] * 2 + 1;
+      for (size_t i = 0; i < 3; ++i) {
+        Eigen::Index dof_x = eidx(nodes[i] * 2);
+        Eigen::Index dof_y = eidx(nodes[i] * 2 + 1);
         F(dof_x) += N[i] * edge.tx * detJ * w;
         F(dof_y) += N[i] * edge.ty * detJ * w;
       }
@@ -397,13 +400,13 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
 
   for (size_t i = 0; i < input.fixed_dofs.size(); i++) {
     size_t d = input.fixed_dofs[i];
-    F -= K.col(d) * input.fixed_values[i];
+    F -= K.col(eidx(d)) * input.fixed_values[i];
   }
 
   std::unordered_set<size_t> fixed(input.fixed_dofs.begin(),
                                    input.fixed_dofs.end());
 
-  std::vector<int> map(ndof, -1);
+  std::vector<Eigen::Index> map(ndof, -1);
   int counter_free = 0;
 
   for (size_t i = 0; i < ndof; i++) {
@@ -419,8 +422,8 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
 
   for (int k = 0; k < K.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(K, k); it; ++it) {
-      int i = it.row();
-      int j = it.col();
+      auto i = static_cast<size_t>(it.row());
+      auto j = static_cast<size_t>(it.col());
       if (map[i] != -1 && map[j] != -1)
         triplets_ff.emplace_back(map[i], map[j], it.value());
     }
@@ -429,7 +432,7 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
   Eigen::VectorXd F_ff(counter_free);
   for (size_t i = 0; i < ndof; i++) {
     if (map[i] != -1)
-      F_ff(map[i]) = F(i);
+      F_ff(map[i]) = F(eidx(i));
   }
 
   check_finite(F_ff, "Reduced force vector F_ff");
@@ -475,13 +478,13 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
         "ERROR: Displacement solution contains NaN or Inf.");
 
   // ── Scatter back to full vector ──
-  Eigen::VectorXd u = Eigen::VectorXd::Zero(ndof);
+  Eigen::VectorXd u = Eigen::VectorXd::Zero(eidx(ndof));
   for (size_t i = 0; i < ndof; i++) {
     if (map[i] != -1)
-      u(i) = u_free(map[i]);
+      u(eidx(i)) = u_free(map[i]);
   }
   for (size_t i = 0; i < input.fixed_dofs.size(); i++) {
-    u(input.fixed_dofs[i]) = input.fixed_values[i];
+    u(eidx(input.fixed_dofs[i])) = input.fixed_values[i];
   }
 
   return u;
@@ -514,8 +517,8 @@ std::vector<Eigen::Vector3d> solve_nodal_stress(const SolverInput &input,
 
     auto sn = extrapolate_to_nodes(sg);
 
-    for (int i = 0; i < 6; ++i) {
-      int gid = e[i];
+    for (size_t i = 0; i < 6; ++i) {
+      size_t gid = e[i];
 
       if (!std::isfinite(sn[i](0)) || !std::isfinite(sn[i](1)) ||
           !std::isfinite(sn[i](2))) {
@@ -553,7 +556,7 @@ SolverOutput solve(const SolverInput &input) {
 
   Eigen::VectorXd T;
   if ((input.boundary_edges.empty()) || (input.boundary_edges.size() == 0)) {
-    T = Eigen::VectorXd::Constant(input.nodes.size(), mat.T0);
+    T = Eigen::VectorXd::Constant(eidx(input.nodes.size()), mat.T0);
   } else {
     T = solve_temperature(input, mat.k);
   }
@@ -568,8 +571,8 @@ SolverOutput solve(const SolverInput &input) {
     out.stress.push_back({s(0), s(1), s(2)});
 
   for (size_t i = 0; i < input.nodes.size(); i++) {
-    out.disp.push_back({u(2 * i), u(2 * i + 1)});
-    out.temperature.push_back(T(i));
+    out.disp.push_back({u(eidx(2 * i)), u(eidx(2 * i + 1))});
+    out.temperature.push_back(T(eidx(i)));
   }
 
   return out;

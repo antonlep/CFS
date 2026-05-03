@@ -7,27 +7,20 @@ python -m venv .venv
 .\.venv\Scripts\activate
 pip install --upgrade pip setuptools wheel
 pip install -e .
+cmake -S . -B build -G Ninja ^
+    -DCMAKE_CXX_COMPILER=clang-cl ^
+    -DCMAKE_C_COMPILER=clang-cl ^
+    -DCMAKE_BUILD_TYPE=Debug ^
+    -DCFS_BUILD_TESTS=ON
 
 # ── GUI ──
 python src\gui\main.py
 
-# ── Dev build (MSVC, fast iteration) ──
-cmake -S . -B build-dev -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCFS_BUILD_TESTS=ON
-cmake --build build-dev
-ctest --test-dir build-dev --output-on-failure
+# ── Build & run CLI ──
+ninja -C build solver_cli
+build\src\solver\solver_cli.exe examples\fem.inp
 
-# ── CLI ──
-ninja -C build-dev solver_cli
-build-dev\src\solver\solver_cli.exe examples\fem.inp
-
-# ── CI-parity build (before pushing) ──
-cmake -S . -B build-ci -G Ninja ^
-    -DCMAKE_CXX_COMPILER=clang-cl ^
-    -DCMAKE_C_COMPILER=clang-cl ^
-    -DCMAKE_BUILD_TYPE=Release ^
-    -DCFS_BUILD_TESTS=ON
-cmake --build build-ci
-ctest --test-dir build-ci --output-on-failure
-
-# ── Python tests (uses pip install -e . build) ──
+# ── Build & run tests ──
+ninja -C build
+ctest --test-dir build --output-on-failure
 pytest tests -v
