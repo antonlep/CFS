@@ -290,7 +290,7 @@ void shape_functions(double xi, double eta, double N[6]) {
 }
 
 Eigen::Matrix<double, 12, 1>
-element_thermal_force(double E, double nu, double alpha, double T0,
+element_thermal_force(double E, double nu, double t, double alpha, double T0,
                       const Nodes &nodes, const Element &e,
                       const Eigen::Matrix<double, 6, 1> &Te) {
   Eigen::Matrix<double, 12, 1> Fe_th = Eigen::Matrix<double, 12, 1>::Zero();
@@ -320,7 +320,7 @@ element_thermal_force(double E, double nu, double alpha, double T0,
     eps_th << 1, 1, 0;
     eps_th *= alpha * (Tgp - T0);
 
-    Fe_th += B.transpose() * D * eps_th * detJ * w;
+    Fe_th += t * B.transpose() * D * eps_th * detJ * w;
   }
 
   return Fe_th;

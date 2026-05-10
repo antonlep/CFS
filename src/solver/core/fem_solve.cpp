@@ -330,7 +330,7 @@ Eigen::VectorXd solve_displacement(const SolverInput &input,
     for (size_t i = 0; i < 6; ++i)
       Te(eidx(i)) = T(eidx(e[i]));
 
-    auto Fe_th = element_thermal_force(E, nu, alpha, T0, input.nodes, e, Te);
+    auto Fe_th = element_thermal_force(E, nu, t, alpha, T0, input.nodes, e, Te);
 
     if (!Fe_th.allFinite()) {
       std::ostringstream oss;

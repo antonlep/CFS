@@ -63,11 +63,15 @@ def extract_mesh(model) -> MeshData:
         [raw_elems[i] - 1 for i in range(j, j + 6)] for j in range(0, len(raw_elems), 6)
     ]
 
-    # Boundary edges: convert to 0-based
+    # Boundary edges: convert to 0-based AND reorder [end1, mid, end2]
     right_edges = [
-        [n - 1 for n in edge] for edge in get_edge_nodes(model, "SIDE_NODES")
+        [edge[0] - 1, edge[2] - 1, edge[1] - 1]
+        for edge in get_edge_nodes(model, "SIDE_NODES")
     ]
-    left_edges = [[n - 1 for n in edge] for edge in get_edge_nodes(model, "X_FIXED")]
+    left_edges = [
+        [edge[0] - 1, edge[2] - 1, edge[1] - 1]
+        for edge in get_edge_nodes(model, "X_FIXED")
+    ]
 
     # Fixed node tags (1-based — converted in boundary_conditions.py)
     x_fixed, _ = get_nodes_by_name(model, "X_FIXED")

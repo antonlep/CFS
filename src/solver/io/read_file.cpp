@@ -27,7 +27,7 @@ SolverInput read_file(const char *filename) {
   std::vector<double> F;
   std::vector<BoundaryEdge> boundary_edges;
   std::vector<TractionEdge> traction_edges;
-  struct MaterialProperties material;
+  struct MaterialProperties material{};
 
   std::unordered_map<int, size_t> node_id_to_index;
 
@@ -265,16 +265,34 @@ SolverInput read_file(const char *filename) {
         traction_edges.push_back(boundary1);
       }
     }
+    myfile.clear();
+    myfile.seekg(0);
+    read = false;
+    while (std::getline(myfile, str)) {
+      if (str.rfind("*MATERIAL", 0) == 0) {
+        read = true;
+        std::getline(myfile, str);
+      }
+      if (str.rfind("*", 0) == 0) {
+        read = false;
+      }
+      if (read == true) {
+        double E, nu, t, k, alpha, T0;
+        std::istringstream iss(str);
+        char sep = ',';
+        iss >> E >> sep >> nu >> sep >> t >> sep >> k >> sep >> alpha >> sep >>
+            T0;
+        material.E = E;
+        material.nu = nu;
+        material.t = t;
+        material.k = k;
+        material.alpha = alpha;
+        material.T0 = T0;
+      }
+    }
     myfile.close();
     myfile2.close();
   }
-
-  material.E = 210e6;
-  material.nu = 0.3;
-  material.t = 1.0;
-  material.k = 45.0;
-  material.alpha = 12e-6;
-  material.T0 = 273.0;
 
   SolverInput input = {nodes, elems,          u_indices,      u,
                        F,     boundary_edges, traction_edges, material};

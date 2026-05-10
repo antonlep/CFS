@@ -34,12 +34,13 @@ struct TractionEdge {
 };
 
 struct MaterialProperties {
-  double E = 210e6;
-  double nu = 0.3;
-  double t = 1.0;
-  double k = 45.0;
-  double alpha = 12e-6;
-  double T0 = 273.0;
+  double E, nu, t, k, alpha, T0;
+  // double E = 210e6;
+  // double nu = 0.3;
+  // double t = 1.0;
+  // double k = 45.0;
+  // double alpha = 12e-6;
+  // double T0 = 273.0;
 };
 
 struct SolverInput {

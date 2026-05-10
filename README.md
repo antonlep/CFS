@@ -1,8 +1,19 @@
-# ══════════════════════════════════════════
-# ALL from x64 Native Tools Command Prompt
-# ══════════════════════════════════════════
+# CFSolve
 
-# ── Setup (once) ──
+## Development Setup
+
+> **All commands must be run from the x64 Native Tools Command Prompt.**
+
+### Prerequisites
+
+- Visual Studio 2022+ with C++ workload
+- Python 3.12+
+- [Ninja](https://ninja-build.org/)
+- [LLVM/clang-cl](https://releases.llvm.org/)
+
+### Initial Setup (once)
+
+```cmd
 python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install --upgrade pip setuptools wheel
@@ -12,15 +23,25 @@ cmake -S . -B build -G Ninja ^
     -DCMAKE_C_COMPILER=clang-cl ^
     -DCMAKE_BUILD_TYPE=Debug ^
     -DCFS_BUILD_TESTS=ON
+```
 
-# ── GUI ──
+### GUI
+
+```cmd
 python src\gui\main.py
+```
 
-# ── Build & run CLI ──
+### CLI
+
+```cmd
 ninja -C build solver_cli
 build\src\solver\solver_cli.exe examples\fem.inp
+```
 
-# ── Build & run tests ──
+### Testing
+
+```cmd
 ninja -C build
 ctest --test-dir build --output-on-failure
 pytest tests -v
+```

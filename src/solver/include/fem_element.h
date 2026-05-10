@@ -27,6 +27,6 @@ Eigen::Matrix<double, 6, 6> element_stiffness_heat(double k, double t,
                                                    const Element &e);
 
 Eigen::Matrix<double, 12, 1>
-element_thermal_force(double nu, double E, double alpha, double T0,
+element_thermal_force(double E, double nu, double t, double alpha, double T0,
                       const Nodes &nodes, const Element &e,
                       const Eigen::Matrix<double, 6, 1> &Te);

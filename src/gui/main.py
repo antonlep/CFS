@@ -16,9 +16,15 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QDoubleSpinBox,
 )
 
-from boundary_conditions import LoadParams, build_boundary_conditions
+from boundary_conditions import (
+    LoadParams,
+    MaterialParams,
+    build_boundary_conditions,
+    build_material,
+)
 from mesh import create_mesh
 from mesh_extract import extract_mesh
 from solver_helpers import solve_from_raw
@@ -62,9 +68,21 @@ class MainWindow(QMainWindow):
         self._width_box = self._spinbox(default=20, step=2)
         form.addRow("Height", self._height_box)
         form.addRow("Width", self._width_box)
+        self._e_box = self._spinbox(default=210, step=10)
+        self._nu_box = self._double_spinbox(default=0.3, step=0.05)
+        self._t_box = self._double_spinbox(default=1, step=0.1)
+        self._k_box = self._spinbox(default=45, step=1)
+        self._alpha_box = self._double_spinbox(default=12, step=1)
+        self._t0_box = self._spinbox(default=273, step=10)
+        form.addRow("Elastic modulus", self._e_box)
+        form.addRow("Poisson's ratio", self._nu_box)
+        form.addRow("Thickness", self._t_box)
+        form.addRow("Thermal conductivity", self._k_box)
+        form.addRow("Thermal expansion coeff", self._alpha_box)
+        form.addRow("Reference temperature", self._t0_box)
 
-        self._fx_box = self._spinbox(default=5000, step=5000, max_val=1000000)
-        self._fy_box = self._spinbox(default=5000, step=5000, max_val=1000000)
+        self._fx_box = self._spinbox(default=100, step=100, max_val=1000000)
+        self._fy_box = self._spinbox(default=100, step=100, max_val=1000000)
         self._temp_left_box = self._spinbox(
             default=300, step=1, min_val=280, max_val=320
         )
@@ -78,7 +96,7 @@ class MainWindow(QMainWindow):
         form.addRow("Temperature right", self._temp_right_box)
         form.addRow("Mesh size", self._mesh_size_box)
 
-        self._scale_box = self._spinbox(default=1000, step=500, max_val=10000)
+        self._scale_box = self._spinbox(default=100, step=50, max_val=10000)
         self._max_box = self._spinbox(
             default=100, step=10, max_val=10000, min_val=-10000
         )
@@ -119,6 +137,12 @@ class MainWindow(QMainWindow):
         for widget in [
             self._height_box,
             self._width_box,
+            self._e_box,
+            self._nu_box,
+            self._t_box,
+            self._k_box,
+            self._alpha_box,
+            self._t0_box,
             self._fx_box,
             self._fy_box,
             self._temp_left_box,
@@ -150,6 +174,16 @@ class MainWindow(QMainWindow):
             temp_right=self._temp_right_box.value(),
         )
 
+    def _read_material(self) -> MaterialParams:
+        return MaterialParams(
+            e=self._e_box.value(),
+            nu=self._nu_box.value(),
+            t=self._t_box.value(),
+            k=self._k_box.value(),
+            alpha=self._alpha_box.value(),
+            t0=self._t0_box.value(),
+        )
+
     def _read_display(self) -> DisplayOptions:
         return DisplayOptions(
             scale=self._scale_box.value(),
@@ -169,6 +203,7 @@ class MainWindow(QMainWindow):
 
         loads = self._read_loads()
         display = self._read_display()
+        material_params = self._read_material()
 
         # 1. Mesh
         model = create_mesh(geom.width, geom.height, display.mesh_size)
@@ -184,6 +219,8 @@ class MainWindow(QMainWindow):
             left_edges=mesh.left_edges,
         )
 
+        material = build_material(material_params)
+
         # 3. Solve
         try:
             results = solve_from_raw(
@@ -194,6 +231,7 @@ class MainWindow(QMainWindow):
                 bcs.forces,
                 bcs.convection_bcs,
                 bcs.traction_bcs,
+                material,
             )
         except Exception as e:
             self._result_label.setText(f"Solver error: {e}")
@@ -242,6 +280,15 @@ class MainWindow(QMainWindow):
         box.setRange(min_val, max_val)
         box.setSingleStep(step)
         box.setValue(default)
+        return box
+
+    @staticmethod
+    def _double_spinbox(default=0, step=1, min_val=0, max_val=100000, decimals=2):
+        box = QDoubleSpinBox()
+        box.setRange(min_val, max_val)
+        box.setSingleStep(step)
+        box.setValue(default)
+        box.setDecimals(decimals)
         return box
 
 

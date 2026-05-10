@@ -1,7 +1,7 @@
 """Build solver boundary conditions from mesh data and load parameters."""
 
 from dataclasses import dataclass
-from solver import BoundaryEdge, TractionEdge
+from solver import BoundaryEdge, TractionEdge, MaterialProperties
 
 
 @dataclass
@@ -10,6 +10,16 @@ class LoadParams:
     force_y: float
     temp_left: float
     temp_right: float
+
+
+@dataclass
+class MaterialParams:
+    e: float
+    nu: float
+    t: float
+    k: float
+    alpha: float
+    t0: float
 
 
 @dataclass
@@ -35,10 +45,12 @@ def build_boundary_conditions(
         x_fixed_tags / y_fixed_tags: 1-based Gmsh node tags
         right_edges / left_edges: 0-based node index triples
     """
-    # --- Fixed DOFs (convert 1-based tags to 0-based DOF indices) ---
-    fixed_dofs = [int((tag - 1) * 2) for tag in x_fixed_tags] + [
-        int((tag - 1) * 2 + 1) for tag in y_fixed_tags
-    ]
+    # Fix all x-DOFs on left edge
+    fixed_dofs = [int((tag - 1) * 2) for tag in x_fixed_tags]
+
+    # Fix only ONE y-DOF to prevent rigid body rotation
+    fixed_dofs.append(int((y_fixed_tags[0] - 1) * 2 + 1))
+
     fixed_values = [0.0] * len(fixed_dofs)
 
     # --- Distributed forces on right edge ---
@@ -94,4 +106,15 @@ def build_boundary_conditions(
         forces=forces,
         convection_bcs=convection_bcs,
         traction_bcs=traction_bcs,
+    )
+
+
+def build_material(params):
+    return MaterialProperties(
+        E=params.e * 1e3,
+        nu=params.nu,
+        t=params.t,
+        k=params.k,
+        alpha=params.alpha * 1e-6,
+        T0=params.t0,
     )
