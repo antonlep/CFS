@@ -27,7 +27,7 @@ SolverInput read_file(const char *filename) {
   std::vector<double> F;
   std::vector<BoundaryEdge> boundary_edges;
   std::vector<TractionEdge> traction_edges;
-  struct MaterialProperties material{};
+  struct MaterialProperties material;
 
   std::unordered_map<int, size_t> node_id_to_index;
 

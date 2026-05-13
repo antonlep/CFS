@@ -22,7 +22,8 @@ cmake -S . -B build -G Ninja ^
     -DCMAKE_CXX_COMPILER=clang-cl ^
     -DCMAKE_C_COMPILER=clang-cl ^
     -DCMAKE_BUILD_TYPE=Debug ^
-    -DCFS_BUILD_TESTS=ON
+    -DCFS_BUILD_TESTS=ON ^
+    -DCMAKE_EXPORT_COMPILER_COMMANDS=ON
 ```
 
 ### GUI
@@ -45,3 +46,15 @@ ninja -C build
 ctest --test-dir build --output-on-failure
 pytest tests -v
 ```
+
+:: ── C++ formatting ──
+clang-format --dry-run --Werror -i src/solver/*.cpp src/solver/*.hpp
+
+:: ── C++ static analysis ──
+clang-tidy src/solver/*.cpp -p build
+
+:: ── Python formatting ──
+black --check src/gui
+
+:: ── Python linting ──
+flake8 src/gui
