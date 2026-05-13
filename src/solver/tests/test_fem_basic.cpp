@@ -52,7 +52,7 @@ TEST_CASE("Single element compression") {
   material.alpha = 12e-6;
   material.T0 = 273.0;
 
-  in.material = material;
+    in.material = material;
 
   SolverOutput out = solve_from_data(in);
 
