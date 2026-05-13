@@ -1,4 +1,5 @@
 from src.gui.solver_helpers import solve_from_raw
+from solver import MaterialProperties
 
 
 def test_two_element():
@@ -31,11 +32,17 @@ def test_two_element():
     forces[-6:] = [1666, 0, 6666, 0, 1666, 0]
     bes = []
     traction_bcs = []
-    result = solve_from_raw(
-        nodes, elements, fixed, displacements, forces, bes, traction_bcs
+    material = MaterialProperties(
+        E=210e6,
+        nu=0.3,
+        t=1,
+        k=45,
+        alpha=12e-6,
+        T0=273,
     )
-
-    print(result.stress)
+    result = solve_from_raw(
+        nodes, elements, fixed, displacements, forces, bes, traction_bcs, material
+    )
 
     for n in result.stress:
         assert n[0] > 999

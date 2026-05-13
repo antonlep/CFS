@@ -15,6 +15,17 @@ TEST_CASE("Single element tension") {
 
   in.forces = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10000, 0};
 
+  MaterialProperties material;
+
+  material.E = 210e6;
+  material.nu = 0.3;
+  material.t = 1.0;
+  material.k = 45.0;
+  material.alpha = 12e-6;
+  material.T0 = 273.0;
+
+  in.material = material;
+
   SolverOutput out = solve_from_data(in);
 
   REQUIRE(out.disp[5][0] > 0.0);
@@ -31,6 +42,17 @@ TEST_CASE("Single element compression") {
   in.fixed_values = {0, 0, 0, 0};
 
   in.forces = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10000, 0};
+
+  MaterialProperties material;
+
+  material.E = 210e6;
+  material.nu = 0.3;
+  material.t = 1.0;
+  material.k = 45.0;
+  material.alpha = 12e-6;
+  material.T0 = 273.0;
+
+  in.material = material;
 
   SolverOutput out = solve_from_data(in);
 
