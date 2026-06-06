@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QVBoxLayout,
+    QHBoxLayout,
     QWidget,
     QDoubleSpinBox,
 )
@@ -62,40 +63,42 @@ class MainWindow(QMainWindow):
     # ── UI Construction ──
 
     def _build_ui(self):
-        form = QFormLayout()
-
+        form1 = QFormLayout()
         self._height_box = self._spinbox(default=10, step=2)
         self._width_box = self._spinbox(default=20, step=2)
-        form.addRow("Height", self._height_box)
-        form.addRow("Width", self._width_box)
+        self._t_box = self._double_spinbox(default=1, step=0.1)
+        form1.addRow("Height", self._height_box)
+        form1.addRow("Width", self._width_box)
+        form1.addRow("Thickness", self._t_box)
+
+        form2 = QFormLayout()
         self._e_box = self._spinbox(default=210, step=10)
         self._nu_box = self._double_spinbox(default=0.3, step=0.05)
-        self._t_box = self._double_spinbox(default=1, step=0.1)
         self._k_box = self._spinbox(default=45, step=1)
         self._alpha_box = self._double_spinbox(default=12, step=1)
-        self._t0_box = self._spinbox(default=273, step=10)
-        form.addRow("Elastic modulus", self._e_box)
-        form.addRow("Poisson's ratio", self._nu_box)
-        form.addRow("Thickness", self._t_box)
-        form.addRow("Thermal conductivity", self._k_box)
-        form.addRow("Thermal expansion coeff", self._alpha_box)
-        form.addRow("Reference temperature", self._t0_box)
+        form2.addRow("Elastic modulus", self._e_box)
+        form2.addRow("Poisson's ratio", self._nu_box)
+        form2.addRow("Thermal conductivity", self._k_box)
+        form2.addRow("Thermal expansion coeff", self._alpha_box)
 
-        self._fx_box = self._spinbox(default=100, step=100, max_val=1000000)
-        self._fy_box = self._spinbox(default=100, step=100, max_val=1000000)
+        form3 = QFormLayout()
+        self._fx_box = self._spinbox(default=10, step=10, max_val=10000)
+        self._fy_box = self._spinbox(default=10, step=10, max_val=10000)
         self._temp_left_box = self._spinbox(
-            default=300, step=1, min_val=280, max_val=320
+            default=300, step=10, min_val=200, max_val=400
         )
         self._temp_right_box = self._spinbox(
-            default=300, step=1, min_val=280, max_val=320
+            default=300, step=10, min_val=200, max_val=400
         )
-        self._mesh_size_box = self._spinbox(default=10, step=1, max_val=100)
-        form.addRow("Force X", self._fx_box)
-        form.addRow("Force Y", self._fy_box)
-        form.addRow("Temperature left", self._temp_left_box)
-        form.addRow("Temperature right", self._temp_right_box)
-        form.addRow("Mesh size", self._mesh_size_box)
+        self._t0_box = self._spinbox(default=273, step=10)
+        form3.addRow("Distr load X", self._fx_box)
+        form3.addRow("Distr load Y", self._fy_box)
+        form3.addRow("Temperature left", self._temp_left_box)
+        form3.addRow("Temperature right", self._temp_right_box)
+        form3.addRow("Reference temperature", self._t0_box)
 
+        form4 = QFormLayout()
+        self._mesh_size_box = self._spinbox(default=5, step=1, max_val=100)
         self._scale_box = self._spinbox(default=100, step=50, max_val=10000)
         self._max_box = self._spinbox(
             default=100, step=10, max_val=10000, min_val=-10000
@@ -106,28 +109,43 @@ class MainWindow(QMainWindow):
         self._auto_scale_box = QCheckBox()
         self._auto_scale_box.setChecked(True)
         self._show_mesh_box = QCheckBox()
-        form.addRow("Scale factor", self._scale_box)
-        form.addRow("Scale max", self._max_box)
-        form.addRow("Scale min", self._min_box)
-        form.addRow("Auto scale", self._auto_scale_box)
-        form.addRow("Display mesh", self._show_mesh_box)
-
         self._result_combo = QComboBox()
         self._result_combo.addItems(RESULT_TYPES)
-        form.addRow("Plot", self._result_combo)
+        form4.addRow("Plot", self._result_combo)
+        form4.addRow("Auto scale", self._auto_scale_box)
+        form4.addRow("Scale max", self._max_box)
+        form4.addRow("Scale min", self._min_box)
+        form4.addRow("Mesh size", self._mesh_size_box)
+        form4.addRow("Display mesh", self._show_mesh_box)
+        form4.addRow("Deformation scale", self._scale_box)
 
+        form5 = QFormLayout()
         solve_btn = QPushButton("Solve")
         solve_btn.clicked.connect(self._solve)
-        form.addRow(solve_btn)
-
+        form5.addRow(solve_btn)
         self._result_label = QLabel("-")
-        form.addRow("Status", self._result_label)
-
+        form5.addRow("Status", self._result_label)
         self._plotter = pvqt.QtInteractor(self)
+        form5.addRow(self._plotter.interactor)
 
         root = QVBoxLayout()
-        root.addLayout(form)
-        root.addWidget(self._plotter.interactor)
+        upper_area = QHBoxLayout()
+        col1 = QVBoxLayout()
+        col1.addLayout(form1)
+        col2 = QVBoxLayout()
+        col2.addLayout(form2)
+        col3 = QVBoxLayout()
+        col3.addLayout(form3)
+        col4 = QVBoxLayout()
+        col4.addLayout(form4)
+        upper_area.addLayout(col1)
+        upper_area.addLayout(col2)
+        upper_area.addLayout(col3)
+        upper_area.addLayout(col4)
+        root.addLayout(upper_area)
+        lower_area = QVBoxLayout()
+        lower_area.addLayout(form5)
+        root.addLayout(lower_area)
 
         central = QWidget()
         central.setLayout(root)
@@ -241,8 +259,8 @@ class MainWindow(QMainWindow):
 
         # 4. Visualize
         result_name = self._result_combo.currentText()
-        grid = build_grid(mesh.nodes, mesh.elements)
-        deform_grid(grid, mesh.nodes, results, display.scale)
+        grid = build_grid(mesh.nodes, mesh.elements, material_params.t)
+        deform_grid(grid, mesh.nodes, results, display.scale, material_params.t)
         apply_results(grid, results, result_name)
 
         self._plot(grid, result_name, display)
