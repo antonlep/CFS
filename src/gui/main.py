@@ -283,7 +283,7 @@ class MainWindow(QMainWindow):
         else:
             edges = grid.extract_feature_edges(
                 boundary_edges=True,
-                feature_edges=False,
+                feature_edges=True,
                 manifold_edges=False,
                 non_manifold_edges=False,
             )
