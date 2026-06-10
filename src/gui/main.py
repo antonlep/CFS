@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QDoubleSpinBox,
+    QTabWidget,
 )
 
 from boundary_conditions import (
@@ -97,8 +98,8 @@ class MainWindow(QMainWindow):
         form3.addRow("Temperature right", self._temp_right_box)
         form3.addRow("Reference temperature", self._t0_box)
 
-        form4 = QFormLayout()
-        self._mesh_size_box = self._spinbox(default=5, step=1, max_val=100)
+        form_disp_set = QFormLayout()
+        self._mesh_size_box = self._spinbox(default=5, step=1, max_val=100, min_val=1)
         self._scale_box = self._spinbox(default=100, step=50, max_val=10000)
         self._max_box = self._spinbox(
             default=100, step=10, max_val=10000, min_val=-10000
@@ -111,44 +112,55 @@ class MainWindow(QMainWindow):
         self._show_mesh_box = QCheckBox()
         self._result_combo = QComboBox()
         self._result_combo.addItems(RESULT_TYPES)
-        form4.addRow("Plot", self._result_combo)
-        form4.addRow("Auto scale", self._auto_scale_box)
-        form4.addRow("Scale max", self._max_box)
-        form4.addRow("Scale min", self._min_box)
-        form4.addRow("Mesh size", self._mesh_size_box)
-        form4.addRow("Display mesh", self._show_mesh_box)
-        form4.addRow("Deformation scale", self._scale_box)
+        form_disp_set.addRow("Plot", self._result_combo)
+        form_disp_set.addRow("Auto scale", self._auto_scale_box)
+        form_disp_set.addRow("Scale max", self._max_box)
+        form_disp_set.addRow("Scale min", self._min_box)
+        form_disp_set.addRow("Mesh size", self._mesh_size_box)
+        form_disp_set.addRow("Display mesh", self._show_mesh_box)
+        form_disp_set.addRow("Deformation scale", self._scale_box)
 
-        form5 = QFormLayout()
+        form_output = QFormLayout()
         solve_btn = QPushButton("Solve")
         solve_btn.clicked.connect(self._solve)
-        form5.addRow(solve_btn)
+        form_output.addRow(solve_btn)
         self._result_label = QLabel("-")
-        form5.addRow("Status", self._result_label)
+        form_output.addRow("Status", self._result_label)
         self._plotter = pvqt.QtInteractor(self)
-        form5.addRow(self._plotter.interactor)
+        form_output.addRow(self._plotter.interactor)
 
-        root = QVBoxLayout()
+        root_layout = QVBoxLayout()
         upper_area = QHBoxLayout()
-        col1 = QVBoxLayout()
-        col1.addLayout(form1)
-        col2 = QVBoxLayout()
-        col2.addLayout(form2)
-        col3 = QVBoxLayout()
-        col3.addLayout(form3)
-        col4 = QVBoxLayout()
-        col4.addLayout(form4)
-        upper_area.addLayout(col1)
-        upper_area.addLayout(col2)
-        upper_area.addLayout(col3)
-        upper_area.addLayout(col4)
-        root.addLayout(upper_area)
+
+        upper_area_left = QTabWidget()
+
+        upper_area_tab1_w = QWidget()
+        upper_area_tab1 = QHBoxLayout()
+        upper_area_tab1.addLayout(form1)
+        upper_area_tab1.addLayout(form2)
+        upper_area_tab1.addLayout(form3)
+        upper_area_tab1_w.setLayout(upper_area_tab1)
+        upper_area_left.addTab(upper_area_tab1_w, "interactive")
+
+        upper_area_tab2_w = QWidget()
+        upper_area_tab2 = QHBoxLayout()
+        upper_area_tab2_w.setLayout(upper_area_tab2)
+
+        upper_area_left.addTab(upper_area_tab2_w, "solve input")
+        upper_area.addWidget(upper_area_left)
+
+        upper_area_right = QVBoxLayout()
+
+        upper_area_right.addLayout(form_disp_set)
+        upper_area.addLayout(upper_area_right)
+        root_layout.addLayout(upper_area)
+
         lower_area = QVBoxLayout()
-        lower_area.addLayout(form5)
-        root.addLayout(lower_area)
+        lower_area.addLayout(form_output)
+        root_layout.addLayout(lower_area)
 
         central = QWidget()
-        central.setLayout(root)
+        central.setLayout(root_layout)
         self.setCentralWidget(central)
 
         # Connect all controls to debounced solve

@@ -14,7 +14,7 @@ RESULT_TYPES = [
 
 
 def build_grid(nodes, elements, thickness: float) -> pv.UnstructuredGrid:
-    """Create a 3D PyVista grid by extruding quadratic triangles into quadratic wedges."""
+    """Create 3D grid by extruding quadratic triangles into quadratic wedges."""
     n = len(nodes)
     h = thickness / 2.0
 
