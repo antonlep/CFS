@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QDoubleSpinBox,
     QTabWidget,
+    QGroupBox,
 )
 
 from boundary_conditions import (
@@ -61,30 +62,59 @@ class MainWindow(QMainWindow):
         self._solve_timer.setInterval(200)
         self._solve_timer.timeout.connect(self._solve)
 
-    # ── UI Construction ──
-
     def _build_ui(self):
-        form1 = QFormLayout()
+        """Build the main window UI."""
+        # Build all input forms
+        geom_form = self._build_geometry_form()
+        mat_form = self._build_material_form()
+        load_form = self._build_loads_form()
+        display_form = self._build_display_form()
+        output_form = self._build_output_form()
+
+        # Assemble layout
+        central = self._assemble_layout(
+            geom_form, mat_form, load_form, display_form, output_form
+        )
+        self.setCentralWidget(central)
+
+        # Wire up signals
+        self._connect_signals()
+
+    # ── Form Builders ──────────────────────────────────────────────
+
+    def _build_geometry_form(self) -> QGroupBox:
         self._height_box = self._spinbox(default=10, step=2)
         self._width_box = self._spinbox(default=20, step=2)
         self._t_box = self._double_spinbox(default=1, step=0.1)
-        form1.addRow("Height", self._height_box)
-        form1.addRow("Width", self._width_box)
-        form1.addRow("Thickness", self._t_box)
 
-        form2 = QFormLayout()
+        form = QFormLayout()
+        form.addRow("Height", self._height_box)
+        form.addRow("Width", self._width_box)
+        form.addRow("Thickness", self._t_box)
+
+        box = QGroupBox("Geometry")
+        box.setLayout(form)
+        return box
+
+    def _build_material_form(self) -> QGroupBox:
         self._e_box = self._spinbox(default=210, step=10)
         self._nu_box = self._double_spinbox(default=0.3, step=0.05)
         self._k_box = self._spinbox(default=45, step=1)
         self._alpha_box = self._double_spinbox(default=12, step=1)
-        form2.addRow("Elastic modulus", self._e_box)
-        form2.addRow("Poisson's ratio", self._nu_box)
-        form2.addRow("Thermal conductivity", self._k_box)
-        form2.addRow("Thermal expansion coeff", self._alpha_box)
 
-        form3 = QFormLayout()
-        self._fx_box = self._spinbox(default=10, step=10, max_val=10000)
-        self._fy_box = self._spinbox(default=10, step=10, max_val=10000)
+        form = QFormLayout()
+        form.addRow("Elastic modulus", self._e_box)
+        form.addRow("Poisson's ratio", self._nu_box)
+        form.addRow("Thermal conductivity", self._k_box)
+        form.addRow("Thermal expansion coeff", self._alpha_box)
+
+        box = QGroupBox("Material")
+        box.setLayout(form)
+        return box
+
+    def _build_loads_form(self) -> QGroupBox:
+        self._fx_box = self._spinbox(default=10, step=10, max_val=10_000)
+        self._fy_box = self._spinbox(default=10, step=10, max_val=10_000)
         self._temp_left_box = self._spinbox(
             default=300, step=10, min_val=200, max_val=400
         )
@@ -92,97 +122,130 @@ class MainWindow(QMainWindow):
             default=300, step=10, min_val=200, max_val=400
         )
         self._t0_box = self._spinbox(default=273, step=10)
-        form3.addRow("Distr load X", self._fx_box)
-        form3.addRow("Distr load Y", self._fy_box)
-        form3.addRow("Temperature left", self._temp_left_box)
-        form3.addRow("Temperature right", self._temp_right_box)
-        form3.addRow("Reference temperature", self._t0_box)
 
-        form_disp_set = QFormLayout()
-        self._mesh_size_box = self._spinbox(default=5, step=1, max_val=100, min_val=1)
-        self._scale_box = self._spinbox(default=100, step=50, max_val=10000)
+        form = QFormLayout()
+        form.addRow("Distr load X", self._fx_box)
+        form.addRow("Distr load Y", self._fy_box)
+        form.addRow("Temperature left", self._temp_left_box)
+        form.addRow("Temperature right", self._temp_right_box)
+        form.addRow("Reference temperature", self._t0_box)
+
+        box = QGroupBox("Loads")
+        box.setLayout(form)
+        return box
+
+    def _build_display_form(self) -> QGroupBox:
+        self._mesh_size_box = self._double_spinbox(
+            default=5, step=0.1, min_val=0.1, max_val=100, decimals=1
+        )
+        self._scale_box = self._spinbox(default=100, step=50, max_val=10_000)
         self._max_box = self._spinbox(
-            default=100, step=10, max_val=10000, min_val=-10000
+            default=100, step=10, min_val=-10_000, max_val=10_000
         )
         self._min_box = self._spinbox(
-            default=-100, step=10, max_val=10000, min_val=-10000
+            default=-100, step=10, min_val=-10_000, max_val=10_000
         )
+
         self._auto_scale_box = QCheckBox()
         self._auto_scale_box.setChecked(True)
         self._show_mesh_box = QCheckBox()
+
         self._result_combo = QComboBox()
         self._result_combo.addItems(RESULT_TYPES)
-        form_disp_set.addRow("Plot", self._result_combo)
-        form_disp_set.addRow("Auto scale", self._auto_scale_box)
-        form_disp_set.addRow("Scale max", self._max_box)
-        form_disp_set.addRow("Scale min", self._min_box)
-        form_disp_set.addRow("Mesh size", self._mesh_size_box)
-        form_disp_set.addRow("Display mesh", self._show_mesh_box)
-        form_disp_set.addRow("Deformation scale", self._scale_box)
 
-        form_output = QFormLayout()
+        form = QFormLayout()
+        form.addRow("Plot", self._result_combo)
+        form.addRow("Auto scale", self._auto_scale_box)
+        form.addRow("Scale max", self._max_box)
+        form.addRow("Scale min", self._min_box)
+        form.addRow("Mesh size", self._mesh_size_box)
+        form.addRow("Display mesh", self._show_mesh_box)
+        form.addRow("Deformation scale", self._scale_box)
+
+        box = QGroupBox("Display")
+        box.setLayout(form)
+        return box
+
+    def _build_output_form(self) -> QFormLayout:
         solve_btn = QPushButton("Solve")
         solve_btn.clicked.connect(self._solve)
-        form_output.addRow(solve_btn)
+
         self._result_label = QLabel("-")
-        form_output.addRow("Status", self._result_label)
         self._plotter = pvqt.QtInteractor(self)
-        form_output.addRow(self._plotter.interactor)
 
-        root_layout = QVBoxLayout()
-        upper_area = QHBoxLayout()
+        form = QFormLayout()
+        form.addRow(solve_btn)
+        form.addRow("Status", self._result_label)
+        form.addRow(self._plotter.interactor)
 
-        upper_area_left = QTabWidget()
+        return form
 
-        upper_area_tab1_w = QWidget()
-        upper_area_tab1 = QHBoxLayout()
-        upper_area_tab1.addLayout(form1)
-        upper_area_tab1.addLayout(form2)
-        upper_area_tab1.addLayout(form3)
-        upper_area_tab1_w.setLayout(upper_area_tab1)
-        upper_area_left.addTab(upper_area_tab1_w, "interactive")
+    # ── Layout Assembly ────────────────────────────────────────────
 
-        upper_area_tab2_w = QWidget()
-        upper_area_tab2 = QHBoxLayout()
-        upper_area_tab2_w.setLayout(upper_area_tab2)
+    def _assemble_layout(
+        self,
+        geom_form: QFormLayout,
+        mat_form: QFormLayout,
+        load_form: QFormLayout,
+        display_form: QFormLayout,
+        output_form: QFormLayout,
+    ) -> QWidget:
+        """Compose all forms into the main window layout."""
+        # Tab 1: interactive inputs
+        interactive_layout = QHBoxLayout()
+        interactive_layout.addWidget(geom_form)
+        interactive_layout.addWidget(mat_form)
+        interactive_layout.addWidget(load_form)
 
-        upper_area_left.addTab(upper_area_tab2_w, "solve input")
-        upper_area.addWidget(upper_area_left)
+        interactive_tab = QWidget()
+        interactive_tab.setLayout(interactive_layout)
 
-        upper_area_right = QVBoxLayout()
+        # Tab 2: solve input (placeholder)
+        solve_input_tab = QWidget()
+        solve_input_tab.setLayout(QHBoxLayout())
 
-        upper_area_right.addLayout(form_disp_set)
-        upper_area.addLayout(upper_area_right)
-        root_layout.addLayout(upper_area)
+        tabs = QTabWidget()
+        tabs.addTab(interactive_tab, "interactive")
+        tabs.addTab(solve_input_tab, "solve input")
 
-        lower_area = QVBoxLayout()
-        lower_area.addLayout(form_output)
-        root_layout.addLayout(lower_area)
+        # Top: tabs on the left, display settings on the right
+        top_row = QHBoxLayout()
+        top_row.addWidget(tabs)
+        top_row.addWidget(display_form)
+
+        # Full window: top row + output below
+        root = QVBoxLayout()
+        root.addLayout(top_row)
+        root.addLayout(output_form)
 
         central = QWidget()
-        central.setLayout(root_layout)
-        self.setCentralWidget(central)
+        central.setLayout(root)
+        return central
 
-        # Connect all controls to debounced solve
-        for widget in [
+    # ── Signal Wiring ──────────────────────────────────────────────
+
+    def _connect_signals(self):
+        """Connect all input widgets to the debounced solve trigger."""
+        value_widgets = [
             self._height_box,
             self._width_box,
+            self._t_box,
             self._e_box,
             self._nu_box,
-            self._t_box,
             self._k_box,
             self._alpha_box,
-            self._t0_box,
             self._fx_box,
             self._fy_box,
             self._temp_left_box,
             self._temp_right_box,
+            self._t0_box,
             self._mesh_size_box,
             self._scale_box,
             self._max_box,
             self._min_box,
-        ]:
-            widget.valueChanged.connect(self._schedule_solve)
+        ]
+        for w in value_widgets:
+            w.valueChanged.connect(self._schedule_solve)
 
         self._result_combo.currentIndexChanged.connect(self._schedule_solve)
         self._show_mesh_box.stateChanged.connect(self._schedule_solve)
@@ -274,6 +337,9 @@ class MainWindow(QMainWindow):
         grid = build_grid(mesh.nodes, mesh.elements, material_params.t)
         deform_grid(grid, mesh.nodes, results, display.scale, material_params.t)
         apply_results(grid, results, result_name)
+
+        print(f"Number of elements: {len(mesh.elements)}")
+        print(f"Number of nodes: {len(mesh.nodes)}")
 
         self._plot(grid, result_name, display)
 
