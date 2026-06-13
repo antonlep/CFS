@@ -20,7 +20,11 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QTabWidget,
     QGroupBox,
+    QFileDialog,
+    QLineEdit,
 )
+
+from pathlib import Path
 
 from boundary_conditions import (
     LoadParams,
@@ -70,10 +74,11 @@ class MainWindow(QMainWindow):
         load_form = self._build_loads_form()
         display_form = self._build_display_form()
         output_form = self._build_output_form()
+        input_layout = self._build_input_form()
 
         # Assemble layout
         central = self._assemble_layout(
-            geom_form, mat_form, load_form, display_form, output_form
+            geom_form, mat_form, load_form, display_form, output_form, input_layout
         )
         self.setCentralWidget(central)
 
@@ -180,6 +185,26 @@ class MainWindow(QMainWindow):
 
         return form
 
+    def _build_input_form(self) -> QFormLayout:
+        self._file_label = QLineEdit()
+
+        self._input_button = QPushButton("Browse")
+        self._input_button.clicked.connect(self._open_file_dialog)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("File:"))
+        layout.addWidget(self._file_label)
+        layout.addWidget(self._input_button)
+
+        return layout
+
+    def _open_file_dialog(self):
+        filename, ok = QFileDialog.getOpenFileName(
+            self, "Select a File", "", "Input files (*.inp)"
+        )
+        if filename:
+            self._file_label.setText(str(Path(filename)))
+
     # ── Layout Assembly ────────────────────────────────────────────
 
     def _assemble_layout(
@@ -189,6 +214,7 @@ class MainWindow(QMainWindow):
         load_form: QFormLayout,
         display_form: QFormLayout,
         output_form: QFormLayout,
+        input_layout: QFormLayout,
     ) -> QWidget:
         """Compose all forms into the main window layout."""
         # Tab 1: interactive inputs
@@ -200,9 +226,9 @@ class MainWindow(QMainWindow):
         interactive_tab = QWidget()
         interactive_tab.setLayout(interactive_layout)
 
-        # Tab 2: solve input (placeholder)
+        # Tab 2: solve input
         solve_input_tab = QWidget()
-        solve_input_tab.setLayout(QHBoxLayout())
+        solve_input_tab.setLayout(input_layout)
 
         tabs = QTabWidget()
         tabs.addTab(interactive_tab, "interactive")
